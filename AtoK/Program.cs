@@ -684,6 +684,8 @@ namespace unpack
             double Size { get; set; }
             double Drill { get; set; }
             int Net { get; set; }
+            Layers StartLayer { get; set; }
+            Layers EndLayer { get; set; }
 
             private Via()
             {
@@ -694,18 +696,23 @@ namespace unpack
                 Net = 0;
             }
 
-            public Via(double x, double y, double size, double drill, int net)
+            public Via(double x, double y, double size, double drill, int net, Layers startlayer, Layers endlayer)
             {
                 X = x;
                 Y = y;
                 Size = size;
                 Drill = drill;
                 Net = net;
+                StartLayer = startlayer;
+                EndLayer = endlayer;
             }
 
             override public string ToString() //double X, double Y)
             {
-                return $"  (via (at {Math.Round(X, Precision)} {Math.Round(-Y, Precision)}) (size {Size}) (drill {Drill}) (layers F.Cu B.Cu) (net {Net}))";
+                string StartL = Brd.GetLayer(StartLayer);
+                string EndL = Brd.GetLayer(EndLayer);
+                string blind = ((StartL != "F.Cu") || (EndL != "B.Cu"))? "blind" : "";
+                return $"  (via {blind} (at {Math.Round(X, Precision)} {Math.Round(-Y, Precision)}) (size {Size}) (drill {Drill}) (layers {StartL} {EndL}) (net {Net}))\n";
             }
         }
 
@@ -1743,11 +1750,13 @@ namespace unpack
             public Type   Type     { get; set; }
             private readonly int offset;
             public uint Binary_size { get; set; }
+            private int Processed;
 
             List<byte[]> binary;
 
             public PcbDocEntry()
             {
+                Processed = 0;
             }
 
             public PcbDocEntry(string filename, string record, Type type, int off)
@@ -1828,6 +1837,13 @@ namespace unpack
                 return true;
             }
 
+            public virtual bool ProcessLine()
+            {
+                Processed++;
+                return true;
+            }
+
+
             public string ConvertToString(byte[] bytes)
             {
                 return new string(bytes.Select(Convert.ToChar).ToArray());
@@ -1836,6 +1852,7 @@ namespace unpack
 
             public virtual bool ProcessLine(byte[] line)
             {
+                Processed++;
                 return true;
             }
 
@@ -1905,7 +1922,7 @@ namespace unpack
             public List<Layer> LayersL;
             public List<Layer> OrderedLayers;
 
-            public Board()
+            public Board() : base()
             {
             }
 
@@ -1950,6 +1967,7 @@ namespace unpack
 
             public override bool ProcessLine(string line)
             {
+                base.ProcessLine();
                 try
                 {
                     InnerLayerCount = 0;
@@ -2442,6 +2460,7 @@ namespace unpack
 
             public override bool ProcessLine(string line)
             {
+                base.ProcessLine();
                 string Net_name = GetString(line, "|NAME=");
                 byte[] bytes = Encoding.ASCII.GetBytes(Net_name);
                 Net net = new Net(net_no + 1, Net_name);
@@ -2455,7 +2474,9 @@ namespace unpack
 
             public override void FinishOff()
             {
-                // now go throught the nets looking for differential pairs and convert to KiCad format
+                base.FinishOff();
+
+                // now go through the nets looking for differential pairs and convert to KiCad format
                 // i.e. ending in + and - rather than _N and _P
                 List<Net> pos = new List<Net>();
                 List<Net> neg = new List<Net>();
@@ -2509,10 +2530,12 @@ namespace unpack
 
             public override bool ProcessLine(string line)
             {
+                base.ProcessLine();
                 Module Mod = new Module(line);
                 ModulesL.Add(Mod);
                 return true;
             }
+
         }
 
         // class for the polygons document entry in the pcbdoc file
@@ -2520,11 +2543,11 @@ namespace unpack
         {
             public Polygons(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
             {
-
             }
 
             public override bool ProcessLine(string line)
             {
+                base.ProcessLine();
                 Polygon Poly = new Polygon(line);
                 if (Poly.InComponent)
                     ModulesL[Poly.Component].Polygons.Add(Poly);
@@ -2532,6 +2555,7 @@ namespace unpack
                     PolygonsL.Add(Poly);
                 return true;
             }
+
         }
 
         // class for scope objects used in design rules
@@ -2714,6 +2738,7 @@ namespace unpack
 
             public override bool ProcessLine(string line)
             {
+                base.ProcessLine();
                 try
                 {
                     Rule Rule = new Rule(line);
@@ -2737,6 +2762,7 @@ namespace unpack
 
             public override bool ProcessLine(string line)
             {
+                base.ProcessLine();
                 if (line.Substring(0, 1) != "|")
                     return false;
                 Dimension Dimension = new Dimension(line); //, l);
@@ -2780,7 +2806,7 @@ namespace unpack
                 double X1, Y1;
                 Int16 Component;
                 Int16 net;
-
+                base.ProcessLine();
                 ArcStruct a = ByteArrayToStructure<ArcStruct>(line);
                 Layer      = (Layers)a.Layer;
                 net        = a.net;
@@ -2855,6 +2881,7 @@ namespace unpack
                 }
                 return true;
             }
+
         }
 
         // class for the pads document entry in the pcbdoc file
@@ -2942,6 +2969,7 @@ namespace unpack
                         ms.Seek(pos, SeekOrigin.Begin);
                         while (pos < size)
                         {
+                            base.ProcessLine();
                             long p = pos;
                             ms.Seek(pos, SeekOrigin.Begin);
                             byte recordtype = br.ReadByte(); // should be 2
@@ -3051,22 +3079,24 @@ namespace unpack
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
             unsafe struct ViaStruct
             {
-                public byte  Type;
-                public UInt32 Offset;
-                public byte  StartLayer;             //  0 1 start layer
-                public byte  EndLayer;               //  1 1 end layer
-                public byte  U0;                     //  2 1 ???
-                public Int16 net;                    //  3 2 net
-                public Int16 U1;                     //  5 2 ???
-                public Int16 Component;              //  7 2 component
-                public Int16 U2;                     //  9 2 ???
-                public Int16 U3;                     //  11 2 ???
-                public Int32 X;                      //  13 4 X
-                public Int32 Y;                      //  17 4 Y
-                public Int32 Width;                  //  21 4 Width
-                public Int32 Hole;                   //  25 4 Hole
-                public fixed byte U4[75-29];         //  28 46 ???
-                public fixed Int32 LayerSizes[32];   // pad size on layers top, mid1,...mid30, bottom
+                public byte  Type;                   //  00 1 3 - type
+                public UInt32 Offset;                //  01 4 203 - record size
+                public byte  U0;                     //  05 1 ???
+                public byte  U1;                     //  06 1 ???
+                public byte  U2;                     //  07 1 ???
+                public Int16 net;                    //  08 2 net
+                public Int16 U3;                     //  0A 2 ???
+                public Int16 Component;              //  0C 2 component
+                public Int16 U4;                     //  0E 2 ???
+                public Int16 U5;                     //  10 2 ???
+                public Int32 X;                      //  12 4 X
+                public Int32 Y;                      //  16 4 Y
+                public Int32 Width;                  //  1A 4 Width
+                public Int32 Hole;                   //  1E 4 Hole
+                public byte  StartLayer;             //  22 1 start layer
+                public byte  EndLayer;               //  23 1 end layer
+                public fixed byte U7[0x50-0x24];     //  24 44 ???
+                public fixed Int32 LayerSizes[32];   //  50 128 pad size on layers top, mid1,...mid30, bottom 
             }
 
             public Vias(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
@@ -3081,6 +3111,7 @@ namespace unpack
                 Int16 Component;
                 Int16 Net;
                 ViaStruct via = ByteArrayToStructure<ViaStruct>(line);
+                base.ProcessLine();
 
                 StartLayer = (Layers)via.StartLayer;
                 EndLayer = (Layers)via.EndLayer;
@@ -3095,7 +3126,7 @@ namespace unpack
 
                 if (!InComponent)
                 {
-                    Via Via = new Via(X, Y, Width, HoleSize, Net);
+                    Via Via = new Via(X, Y, Width, HoleSize, Net, StartLayer, EndLayer);
                     ViasL.Add(Via);
                 }
                 else
@@ -3106,6 +3137,7 @@ namespace unpack
                 }
                 return true;
             }
+
         }
 
         // class for the tracks document entry in the pcbdoc file
@@ -3124,6 +3156,7 @@ namespace unpack
                 Layers layer;
                 bool InComponent = false;
                 Int16 component = 0;
+                base.ProcessLine();
                 net = B2UInt16(line, 3 + 5);
                 if (net == 0x0000FFFF)
                     net = 0;
@@ -3354,6 +3387,7 @@ namespace unpack
 
             public override bool ProcessLine(string line)
             {
+                base.ProcessLine();
                 return base.ProcessLine(line);
             }
         }
@@ -3379,6 +3413,7 @@ namespace unpack
 
             public override bool ProcessLine(byte[] record)
             {
+                base.ProcessLine();
                 using (MemoryStream ms = new MemoryStream(record))
                 {
                     // Use the memory stream in a binary reader.
@@ -3456,7 +3491,8 @@ $@"
                     return true;
                 }
             }
-        }
+
+       }
 
         // class for the differential pairs document entry in the pcbdoc file
         class DifferentialPairs : PcbDocEntry
@@ -3467,6 +3503,7 @@ $@"
 
             public override bool ProcessLine(string line)
             {
+                base.ProcessLine();
                 return base.ProcessLine(line);
             }
         }
@@ -3571,6 +3608,7 @@ $@"
 
                 return ret;
             }
+
         }
 
         // class for the regions document entry in the pcbdoc file
@@ -3606,6 +3644,7 @@ $@"
                 Layers Layer;
                 Int16  Component;
                 bool   InComponent;
+                base.ProcessLine();
 
                 using (MemoryStream ms = new MemoryStream(record))
                 {
@@ -3705,7 +3744,7 @@ $@"
 
         // class for the 3D models document entry in the pcbdoc file
         class Models6 : PcbDocEntry
-        { 
+        {
             public Models6(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
             { 
             }
@@ -3722,6 +3761,7 @@ $@"
                     BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
                     while (pos < size)
                     {
+                        base.ProcessLine();
                         ms.Seek(pos, SeekOrigin.Begin);
                         uint next = br.ReadUInt32();
                         char[] line = br.ReadChars((int)next);
@@ -3806,6 +3846,7 @@ $@"
 
             public override bool ProcessLine( string line)
             {
+                base.ProcessLine();
                 ComponentBody ComponentBody = new ComponentBody(line);
                 if (ComponentNumber >= ModulesL.Count)
                 {
@@ -3861,6 +3902,7 @@ $@"
 
             public override bool ProcessLine(byte[] line)
             {
+                base.ProcessLine();
                 Int16 ComponentNumber = 0;
                 using (MemoryStream ms = new MemoryStream(line))
                 {
