@@ -1234,6 +1234,8 @@ namespace ConvertToKicad
                 Name = GetString(line, "|PATTERN=");
                 if (Name.Contains("\\"))
                     Name = Name.Replace("\\", "_"); // TODO check this out
+                if(Name.Contains("\""))
+                    Name = Name.Replace("\"", "_");
                 if ((param = GetString(line, "|X=").Trim(charsToTrim)) != "")
                 {
                     X = GetCoordinateX(param);
@@ -2043,6 +2045,7 @@ namespace ConvertToKicad
                             if (Kind == "0")
                             {
                                 board_outline += $"  (gr_line (start {x} {-y}) (end {nx} {-ny}) (layer Edge.Cuts) (width 0.05))\n";
+                                OutputString(board_outline);
                                 BoardAddLine(x, y, nx, ny);
                             }
                             else
@@ -2058,6 +2061,7 @@ namespace ConvertToKicad
                                 double X = Math.Round(cx + r * Math.Cos(sa * Math.PI / 180), Precision);
                                 double Y = Math.Round(cy + r * Math.Sin(sa * Math.PI / 180), Precision);
                                 board_outline += $"  (gr_arc (start {X1} {-Y1}) (end {X} {-Y}) (angle {Angle}) (layer Edge.Cuts) (width {0.05}))\n";
+                                OutputString(board_outline);
                                 BoardAddArc(X1, Y1, X, Y, Angle);
                             }
                         }
@@ -2824,7 +2828,7 @@ namespace ConvertToKicad
                 Y1 = Math.Round((double)a.Y1 * 25.4 / 10000000 - originY, Precision);
                 Radius = Math.Round((double)a.Radius * 25.4 / 10000000, Precision);
                 StartAngle = a.StartAngle;
-                EndAngle = a.EndAngle;
+                EndAngle = a.EndAngle % 360;
                 Width = (double)(a.Width * 25.4 / 10000000);
 
                 bool InComponent = Component != -1;
@@ -2842,7 +2846,7 @@ namespace ConvertToKicad
                 {
                     if (net > 0 && Brd.IsCopperLayer(Layer))
                     {
-                        // we have an arc track on a copper layer and it has a net
+                        // we have an arc/track on a copper layer and it has a net
                         // these aren't supported by KiCad yet so generate a curve out of track segments
                         // first normalise it so that the centre is at 0,0
                         // save the centre point
@@ -4406,6 +4410,14 @@ $@"
         public unsafe void ConvertFile(string FileName, bool extractFiles, bool createLib)
         {
             ConvertRunning = true;
+            net_classes = "";
+            tracks = "";
+            texts = "";
+            arcs = "";
+            fills = "";
+            keepouts = "";
+            board_outline = "";
+
             try
             {
                 Brd            = new Board();
@@ -4541,6 +4553,11 @@ $@"
                     OutputError(Ex.Message);
                 }
                 Directory.Move(@"Root Entry\Models", "Models");
+                if(!Directory.EnumerateFileSystemEntries("Models").Any())
+                {
+                    // Models directory is empty so get rid
+                    Directory.Delete("Models", true);
+                }
                 if (!ExtractFiles)
                 {
                     Directory.Delete("Root Entry", true);
@@ -4560,7 +4577,6 @@ $@"
                 output_filename = output_filename.Substring(0, index) + ".kicad_pcb";
 
                 OutputString("Outputting Kicad PCB file");
-                //            output_filename = UnpackDirectory + "\\" + output_filename;
                 System.IO.StreamWriter OutFile = new System.IO.StreamWriter(output_filename);
 
                 // TODO find extremes of pcb to select correct page size
