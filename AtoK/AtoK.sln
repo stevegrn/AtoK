@@ -3,23 +3,23 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.421
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AtoK", "AtoK.csproj", "{C1654F6F-14E4-4C06-B85F-529BA2DBE1E9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AtoK", "AtoK.csproj", "{62DEFEE4-677C-441D-8554-1958F4F6ACBC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{C1654F6F-14E4-4C06-B85F-529BA2DBE1E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C1654F6F-14E4-4C06-B85F-529BA2DBE1E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C1654F6F-14E4-4C06-B85F-529BA2DBE1E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C1654F6F-14E4-4C06-B85F-529BA2DBE1E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{62DEFEE4-677C-441D-8554-1958F4F6ACBC}.Debug|x86.ActiveCfg = Debug|x86
+		{62DEFEE4-677C-441D-8554-1958F4F6ACBC}.Debug|x86.Build.0 = Debug|x86
+		{62DEFEE4-677C-441D-8554-1958F4F6ACBC}.Release|x86.ActiveCfg = Release|x86
+		{62DEFEE4-677C-441D-8554-1958F4F6ACBC}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {62A046CA-1DDB-4ED0-A303-8B07AC351D36}
+		SolutionGuid = {C9E5A96A-0D24-4851-AB20-B5AE91242D69}
 	EndGlobalSection
 EndGlobal

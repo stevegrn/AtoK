@@ -1,9 +1,0 @@
-{
-  "profiles": {
-    "AtoK": {
-      "commandName": "Project",
-      "commandLineArgs": "example2.pcbdoc  -l 2>errors.txt",
-      "workingDirectory": "C:\\Users\\Steve\\Downloads\\unpack\\Example PCBs"
-    }
-  }
-}
