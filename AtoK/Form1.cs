@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using ConvertToKicad;
+using System.Diagnostics;
 
 namespace AtoK
 {
@@ -55,6 +56,7 @@ namespace AtoK
             LibraryGen.CheckState = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
             Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
             fileName.Text = Properties.Settings.Default.LastFile;
+            fileName.Select(fileName.Text.Length, 0); // scroll to make filename visible
         }
 
         // shutdown the worker thread when the form closes
@@ -71,6 +73,7 @@ namespace AtoK
 
         public Line outputList_Add(string str, Color color)
         {
+            Invoke((MethodInvoker)(() => outputList.BeginUpdate()));
             Line newLine = new Line(str, color);
             lines.Add(newLine);
             int testWidth = TextRenderer.MeasureText(str,
@@ -82,6 +85,7 @@ namespace AtoK
             Invoke((MethodInvoker)(() => outputList.HorizontalExtent = outputlist_width));
             Invoke((MethodInvoker)(() => outputList.Items.Add(newLine)));
             Invoke((MethodInvoker)(() => outputList_Scroll()));
+            Invoke((MethodInvoker)(() => outputList.EndUpdate()));
             return newLine;
         }
 
@@ -290,7 +294,7 @@ namespace AtoK
             Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
             ConvertPCBDoc.Verbose = Verbose.CheckState == CheckState.Checked;
             fileName.Text = Properties.Settings.Default.LastFile;
-//            Debug.WriteLine($"File={fileName.Text}");
+            fileName.Select(fileName.Text.Length, 0); // scroll to make filename visible
         }
 
         private void Form1_Closing(object sender, FormClosingEventArgs e)
@@ -343,6 +347,8 @@ namespace AtoK
                 fileName.Enabled = false;
 //                button1.Enabled = false;
                 button2.Enabled = false;
+                CleanUp.Enabled = false;
+                LaunchPCBNew.Enabled = false;
                 //start the conversion
                 Cursor.Current = Cursors.WaitCursor;
                 t = new Thread(() =>
@@ -372,6 +378,10 @@ namespace AtoK
             button1.Update();
             button2.Enabled = true;
             button2.Update();
+            CleanUp.Enabled = true;
+            CleanUp.Update();
+            LaunchPCBNew.Enabled = true;
+            LaunchPCBNew.Update();
         }
 
         private void button2_Click(object sender, EventArgs e)
@@ -396,6 +406,7 @@ namespace AtoK
             if (openFileDialog1.ShowDialog() == DialogResult.OK)
             {
                 fileName.Text = openFileDialog1.FileName;
+                fileName.Select(fileName.Text.Length, 0); // scroll to make filename visible
             }
 
         }
@@ -413,8 +424,8 @@ namespace AtoK
             control.Width = button1.Right;
             outputList.Width = this.Width-30;
             outputList.Left = fileName.Left;
-            outputList.Top = button1.Bottom + 10;
-            outputList.Height = control.Height - button1.Bottom - 50;
+            outputList.Top = Verbose.Bottom + 10;
+            outputList.Height = control.Height - Verbose.Bottom - 50;
         }
 
         private void Verbose_Click(object sender, EventArgs e)
@@ -445,5 +456,58 @@ namespace AtoK
                 busy.Visible = true;
             }
         }
+
+        private void LaunchPCBNew_Click(object sender, EventArgs e)
+        {
+            Process p = new Process();
+            if (fileName.Text != "" && File.Exists(fileName.Text))
+            {
+                string UnpackDirectory = fileName.Text.Substring(0, fileName.Text.IndexOf('.')) + "-Kicad";
+                UnpackDirectory = UnpackDirectory.Replace('.', '-');
+                if (Directory.Exists(UnpackDirectory))
+                {
+                    int index = fileName.Text.LastIndexOf('.');
+                    string FileName;
+                    FileName = fileName.Text.Substring(fileName.Text.LastIndexOf('\\')+1);
+                    FileName = FileName.Substring(0, FileName.LastIndexOf('.'));
+
+                    string output_filename = UnpackDirectory + "\\" + FileName + ".kicad_pcb";
+
+                    if (File.Exists(output_filename))
+                    {
+                        try
+                        {
+                            p.StartInfo = new ProcessStartInfo("C:\\Program Files\\KiCad\\bin\\pcbnew.exe","\""+ output_filename + "\"");
+                            p.StartInfo.RedirectStandardOutput = false;
+                            p.StartInfo.RedirectStandardError = true;
+                            p.StartInfo.UseShellExecute = false;
+                            p.Start();
+                        }
+                        catch(System.ComponentModel.Win32Exception)
+                        {
+                            ConvertPCBDoc.OutputError("Couldn't launch PcbNew");
+                        }
+                    }
+                }
+            }
+        }
+
+        private void CleanUp_Click(object sender, EventArgs e)
+        {
+            ConvertPCBDoc.OutputString("Cleaning Up");
+            string UnpackDirectory = fileName.Text.Substring(0, fileName.Text.IndexOf('.')) + "-Kicad";
+            UnpackDirectory = UnpackDirectory.Replace('.', '-');
+            if (Directory.Exists(UnpackDirectory))
+            {
+                ConvertPCBDoc.OutputString($"Removing {UnpackDirectory}");
+                ConvertPCBDoc.ClearFolder(UnpackDirectory);
+            }
+            else
+            {
+                ConvertPCBDoc.OutputError("Output directory doesn't exist");
+            }
+        }
+
     }
- }
+}
+

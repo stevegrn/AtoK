@@ -32,7 +32,7 @@ namespace ConvertToKicad
         public static string filename = "";
         public static string output_filename = "";
         static char[] charsToTrim = { 'm', 'i', 'l' };
-
+        static FileVersionInfo FV;
         static ObjectList<Net> NetsL;
         static ObjectList<Module> ModulesL;
         static ObjectList<Polygon> PolygonsL;
@@ -987,7 +987,10 @@ namespace ConvertToKicad
 
             public Pad(string number, string type, string shape, double x, double y, double rotation, double sizex, double sizey, double drill, string layer, int net)
             {
+                if (number == "")
+                    number = "0";
                 Number = number;
+
                 Type = type;
                 Shape = shape;
                 X = x;
@@ -1871,11 +1874,175 @@ namespace ConvertToKicad
             }
         }
 
+        // class to hold version info
+        class Version
+        {
+            public string VER { get; set; }
+            //public string FWDMSG { get; set; }
+            //public string BKMSG { get; set; }
+
+            Version()
+            {
+                VER = "";
+                //FWDMSG = "";
+                //BKMSG = "";
+            }
+
+            public Version(string ver, string fwdmsg, string bkmsg)
+            {
+                VER    = ver.Substring(ver.IndexOf('=')+1);
+                //FWDMSG = fwdmsg.Substring(fwdmsg.IndexOf('=')+1);
+                //BKMSG  = bkmsg.Substring(bkmsg.IndexOf('=')+1);
+            }
+
+            public override string ToString()
+            {
+                return $"{VER}";
+            }
+        }
+
         class FileVersionInfo : PcbDocEntry
         {
+            private int Count;
+            private List<Version> Versions;
+
+            public class VersionParam
+            {
+                public string Version { get; set; }
+                public int PadOffset { get; set; }
+
+                public VersionParam()
+                {
+                    Version = "";
+                    PadOffset = 0;
+                }
+
+                public VersionParam(string version, int padOffset)
+                {
+                    Version = version;
+                    PadOffset = padOffset;
+                }
+
+                int GetPadOffset()
+                {
+                    return 141;
+                }
+
+            }
+
+            public VersionParam VP { get; set; }
+
+            static List<VersionParam> VersionParamL = new List<VersionParam>
+            {
+                new VersionParam("FileVersionInfo", 141),
+                new VersionParam("6.3", 141),
+                new VersionParam("6.6", 141),
+                new VersionParam("6.8", 141),
+                new VersionParam("6.8", 141),
+                new VersionParam("6.8", 141),
+                new VersionParam("6.8", 141),
+                new VersionParam("6.8", 141),
+                new VersionParam("6.8", 141),
+                new VersionParam("6.9", 141),
+                new VersionParam("6.9", 141),
+                new VersionParam("7.0", 141),
+                new VersionParam("Winter 09,", 141),
+                new VersionParam("Winter 09", 141),
+                new VersionParam("Winter 09", 141),
+                new VersionParam("Winter 09", 141),
+                new VersionParam("Summer 09", 141),
+                new VersionParam("Summer 09", 141),
+                new VersionParam("Summer 09", 141),
+                new VersionParam("Release 10", 141),
+                new VersionParam("Release 10", 849),
+                new VersionParam("Release 10", 849),
+                new VersionParam("Release 10 update 1", 849),
+                new VersionParam("Release 10 update 15", 849),
+                new VersionParam("Release 12", 849),
+                new VersionParam("Release 13", 849),
+                new VersionParam("Release 14", 849),
+                new VersionParam("Release 15", 849),
+                new VersionParam("Release 15.1", 849),
+                new VersionParam("Release 16.0", 849),
+                new VersionParam("Release 17.0", 849),
+                new VersionParam("Release 17.0", 849),
+                new VersionParam("Release 17.1", 849),
+                new VersionParam("Release 17.1", 849)
+            };
+
             public FileVersionInfo(string filename, string record, Type type, int off) : base(filename, record, type, off)
             {
+                Count = 0;
+                Versions = new List<Version>();
+                VP = new VersionParam();
+            }
 
+            public override bool ProcessLine(string line)
+            {
+                string[] words;
+                words = line.Split('|');
+                string[] chars;
+                string str="";
+                string ver = "";
+                string fwd = "";
+                string bck = "";
+
+                foreach (var s in words)
+                {
+                    if(s.IndexOf('=')>0)
+                    { 
+                        string[] par = s.Split('=');
+                        if (par[0] == "COUNT")
+                        {
+                            str = $"Count={par[1]}";
+                            Count = Convert.ToInt16(par[1]);
+                        }
+                        else
+                        {
+                            chars = par[1].Split(',');
+                            str = par[0] + "=";
+                            foreach (var c in chars)
+                            {
+                                if (c != "")
+                                {
+                                    int ch = Convert.ToInt16(c);
+                                    str += Convert.ToChar(ch);
+                                }
+                            }
+                        }
+                        if (str.Contains("VER"))
+                            ver = str;
+                        if (str.Contains("FWD"))
+                            fwd = str;
+                        if(str.Contains("BKM"))
+                        {
+                            bck = str;
+                            Version Version = new Version(ver, fwd, bck);
+                            Versions.Add(Version);
+                            OutputString(Version.ToString());
+                        }
+                    }
+                 }
+                base.ProcessLine();
+                return true;
+            }
+
+            public override void FinishOff()
+            {
+                foreach(var Ver in VersionParamL)
+                {
+                    if(Versions[Versions.Count - 1].VER == Ver.Version)
+                    {
+                        VP = Ver;
+                        break;
+                    }
+                }
+                OutputString($"Board saved by \"Altium {Versions[Versions.Count-1].VER}\"");
+            }
+
+            public int GetPadLength()
+            {
+                return 0;
             }
         }
 
@@ -2045,7 +2212,6 @@ namespace ConvertToKicad
                             if (Kind == "0")
                             {
                                 board_outline += $"  (gr_line (start {x} {-y}) (end {nx} {-ny}) (layer Edge.Cuts) (width 0.05))\n";
-                                OutputString(board_outline);
                                 BoardAddLine(x, y, nx, ny);
                             }
                             else
@@ -2061,7 +2227,6 @@ namespace ConvertToKicad
                                 double X = Math.Round(cx + r * Math.Cos(sa * Math.PI / 180), Precision);
                                 double Y = Math.Round(cy + r * Math.Sin(sa * Math.PI / 180), Precision);
                                 board_outline += $"  (gr_arc (start {X1} {-Y1}) (end {X} {-Y}) (angle {Angle}) (layer Edge.Cuts) (width {0.05}))\n";
-                                OutputString(board_outline);
                                 BoardAddArc(X1, Y1, X, Y, Angle);
                             }
                         }
@@ -2168,25 +2333,25 @@ namespace ConvertToKicad
                 switch (AltiumLayer)
                 {
                     /*
-                                        case Layers.top_layer: return "F.Cu";*/
+                    case Layers.top_layer: return "F.Cu";*/
                     case Layers.Multi_Layer: return "*.Cu"; // *.Mask";
-                                                            /*                    case Layers.bottom_layer: return "B.Cu";
-                                                                                case Layers.plane_1: return "In1.Cu";
-                                                                                case Layers.plane_2: return "In2.Cu";
-                                                                                case Layers.plane_3: return "In3.Cu";
-                                                                                case Layers.plane_4: return "In4.Cu";
-                                                                                case Layers.plane_5: return "In5.Cu";
-                                                                                case Layers.plane_6: return "In6.Cu";
-                                                                                case Layers.plane_7: return "In7.Cu";
-                                                                                case Layers.plane_8: return "In8.Cu";
-                                                                                case Layers.plane_9: return "In9.Cu";
-                                                                                case Layers.plane_10: return "In10.Cu";
-                                                                                case Layers.plane_11: return "In11.Cu";
-                                                                                case Layers.plane_12: return "In12.Cu";
-                                                                                case Layers.plane_13: return "In13.Cu";
-                                                                                case Layers.plane_14: return "In14.Cu";
-                                                                                case Layers.plane_15: return "In15.Cu";
-                                                                                case Layers.plane_16: return "In16.Cu";
+/*                    case Layers.bottom_layer: return "B.Cu";
+                    case Layers.plane_1: return "In1.Cu";
+                    case Layers.plane_2: return "In2.Cu";
+                    case Layers.plane_3: return "In3.Cu";
+                    case Layers.plane_4: return "In4.Cu";
+                    case Layers.plane_5: return "In5.Cu";
+                    case Layers.plane_6: return "In6.Cu";
+                    case Layers.plane_7: return "In7.Cu";
+                    case Layers.plane_8: return "In8.Cu";
+                    case Layers.plane_9: return "In9.Cu";
+                    case Layers.plane_10: return "In10.Cu";
+                    case Layers.plane_11: return "In11.Cu";
+                    case Layers.plane_12: return "In12.Cu";
+                    case Layers.plane_13: return "In13.Cu";
+                    case Layers.plane_14: return "In14.Cu";
+                    case Layers.plane_15: return "In15.Cu";
+                    case Layers.plane_16: return "In16.Cu";
                                                             */
                     case Layers.Top_Overlay: return "F.SilkS";
                     case Layers.Bottom_Overlay: return "B.SilkS";
@@ -2265,62 +2430,62 @@ namespace ConvertToKicad
                 return false;
             }
             /*
-                        // get the number of a copper layer
-                        public int GetAltiumCopperLayerNumber(string Layer)
-                        {
-                            switch (Layer)
-                            {
-                                case "Top Layer": return 1;
-                                case "MidLayer1": return 2;
-                                case "MidLayer2": return 3;
-                                case "MidLayer3": return 4;
-                                case "MidLayer4": return 5;
-                                case "MidLayer5": return 6;
-                                case "MidLayer6": return 7;
-                                case "MidLayer7": return 8;
-                                case "MidLayer8": return 9;
-                                case "MidLayer9": return 10;
-                                case "MidLayer10": return 11;
-                                case "MidLayer11": return 12;
-                                case "MidLayer12": return 13;
-                                case "MidLayer13": return 14;
-                                case "MidLayer14": return 15;
-                                case "MidLayer15": return 16;
-                                case "MidLayer16": return 17;
-                                case "MidLayer17": return 18;
-                                case "MidLayer18": return 19;
-                                case "MidLayer19": return 20;
-                                case "MidLayer20": return 21;
-                                case "MidLayer21": return 22;
-                                case "MidLayer22": return 23;
-                                case "MidLayer23": return 24;
-                                case "MidLayer24": return 25;
-                                case "MidLayer25": return 26;
-                                case "MidLayer26": return 27;
-                                case "MidLayer27": return 28;
-                                case "MidLayer28": return 29;
-                                case "MidLayer29": return 30;
-                                case "MidLayer30": return 31;
-                                case "Bottom Layer": return 32;
-                                case "InternalPlane1": return 39;
-                                case "InternalPlane2": return 40;
-                                case "InternalPlane3": return 41;
-                                case "InternalPlane4": return 42;
-                                case "InternalPlane5": return 43;
-                                case "InternalPlane6": return 44;
-                                case "InternalPlane7": return 45;
-                                case "InternalPlane8": return 46;
-                                case "InternalPlane9": return 47;
-                                case "InternalPlane10": return 48;
-                                case "InternalPlane11": return 49;
-                                case "InternalPlane12": return 50;
-                                case "InternalPlane13": return 51;
-                                case "InternalPlane14": return 52;
-                                case "InternalPlane15": return 53;
-                                case "InternalPlane16": return 54;
-                            }
-                            return 0;
-                        }
+            // get the number of a copper layer
+            public int GetAltiumCopperLayerNumber(string Layer)
+            {
+                switch (Layer)
+                {
+                    case "Top Layer": return 1;
+                    case "MidLayer1": return 2;
+                    case "MidLayer2": return 3;
+                    case "MidLayer3": return 4;
+                    case "MidLayer4": return 5;
+                    case "MidLayer5": return 6;
+                    case "MidLayer6": return 7;
+                    case "MidLayer7": return 8;
+                    case "MidLayer8": return 9;
+                    case "MidLayer9": return 10;
+                    case "MidLayer10": return 11;
+                    case "MidLayer11": return 12;
+                    case "MidLayer12": return 13;
+                    case "MidLayer13": return 14;
+                    case "MidLayer14": return 15;
+                    case "MidLayer15": return 16;
+                    case "MidLayer16": return 17;
+                    case "MidLayer17": return 18;
+                    case "MidLayer18": return 19;
+                    case "MidLayer19": return 20;
+                    case "MidLayer20": return 21;
+                    case "MidLayer21": return 22;
+                    case "MidLayer22": return 23;
+                    case "MidLayer23": return 24;
+                    case "MidLayer24": return 25;
+                    case "MidLayer25": return 26;
+                    case "MidLayer26": return 27;
+                    case "MidLayer27": return 28;
+                    case "MidLayer28": return 29;
+                    case "MidLayer29": return 30;
+                    case "MidLayer30": return 31;
+                    case "Bottom Layer": return 32;
+                    case "InternalPlane1": return 39;
+                    case "InternalPlane2": return 40;
+                    case "InternalPlane3": return 41;
+                    case "InternalPlane4": return 42;
+                    case "InternalPlane5": return 43;
+                    case "InternalPlane6": return 44;
+                    case "InternalPlane7": return 45;
+                    case "InternalPlane8": return 46;
+                    case "InternalPlane9": return 47;
+                    case "InternalPlane10": return 48;
+                    case "InternalPlane11": return 49;
+                    case "InternalPlane12": return 50;
+                    case "InternalPlane13": return 51;
+                    case "InternalPlane14": return 52;
+                    case "InternalPlane15": return 53;
+                    case "InternalPlane16": return 54;
+                }
+                return 0;
+            }
             */
             // used for non-net tracks on inner copper layers
             // to eliminate them as PCBNEW doesn't do negative planes
@@ -2829,7 +2994,7 @@ namespace ConvertToKicad
                 Radius = Math.Round((double)a.Radius * 25.4 / 10000000, Precision);
                 StartAngle = a.StartAngle;
                 EndAngle = a.EndAngle % 360;
-                Width = (double)(a.Width * 25.4 / 10000000);
+                Width = Math.Round((double)(a.Width * 25.4 / 10000000), Precision);
 
                 bool InComponent = Component != -1;
                 double Angle;
@@ -2899,6 +3064,8 @@ namespace ConvertToKicad
         // class for the pads document entry in the pcbdoc file
         class Pads : PcbDocEntry
         {
+            // TODO change the following comments to reflect the new way of getting the size
+            // based on the revision of Altium which the board was saved
             // Layout of memory after the pad name string
             // normally 141 bytes long but if it is a surface mount pad and it has a hole shape which is not round
             // or it has the plated attribute set then the record size becomes 737 for some bizarre reason
@@ -2947,12 +3114,13 @@ namespace ConvertToKicad
                 public fixed byte U10[6];       // 118 6 ???
                 public byte UsePasteMaskRules;  // 124 1 use paste expansion rules (CPEV)
                 public byte UseSolderMaskRules; // 125 1 use solder mask expansion rules (CSEV)
-                public fixed byte U11[3];      // 126 7 ??? 
+                public fixed byte U11[3];       // 126 7 ??? 
                 public int HoleRotation;        // 129 4 hole rotation
                 public short JumperID;          // 133 2 jumper ID
                 public fixed byte U12[6];       // 135 6 ???
                 public fixed int MidLayerXSize[29]; // 141 29*4 Midlayers 2-30
                 public fixed int MidLayerYSixe[29]; // 257 29*4 MidLayers 2-30
+                public fixed byte U13[849 - 373];   // 373
 
             }
 
@@ -2985,6 +3153,8 @@ namespace ConvertToKicad
                             long p = pos;
                             ms.Seek(pos, SeekOrigin.Begin);
                             byte recordtype = br.ReadByte(); // should be 2
+                            if (recordtype != 2)
+                                OutputString($"Invalid record type {recordtype}");
                             UInt32 next = br.ReadUInt32();
                             uint l = br.ReadByte(); // string length
                             uint headersize = 6 + l;
@@ -3003,7 +3173,8 @@ namespace ConvertToKicad
                             Int16 Component;
                             Int16 Net;
                             Int16 JumperID;
-                            byte[] bytes = br.ReadBytes(141);  // read the number of bytes found in a normal record
+                            int s = System.Runtime.InteropServices.Marshal.SizeOf(typeof(PadStruct));
+                            byte[] bytes = br.ReadBytes(FV.VP.PadOffset); // System.Runtime.InteropServices.Marshal.SizeOf(typeof(PadStruct)));// 141);  // read the number of bytes found in a normal record
                             pos = (uint)ms.Position;
 
                             // let's use some "unsafe" stufF
@@ -4273,9 +4444,9 @@ $@"
                             using (System.IO.BinaryWriter file = new System.IO.BinaryWriter(File.OpenWrite(it.Name + ".dat")))
                             {
                                 // get file contents and write to file
-                                CFStream stream = it as CFStream;
+                                CFStream fstream = it as CFStream;
 
-                                byte[] temp = stream.GetData();
+                                byte[] temp = fstream.GetData();
                                 try
                                 {
                                     // Writer raw data                
@@ -4306,6 +4477,7 @@ $@"
                     storage.VisitEntries(vs, true);
                 }
 
+                CFStream stream;
                 try
                 {
                     if (ExtractFiles)
@@ -4331,7 +4503,7 @@ $@"
                             }
                         }
                     }
-                    CFStream stream = storage.GetStream("Data");
+                    /*CFStream*/ stream = storage.GetStream("Data");
                     // get file contents and process
                     byte[] data = stream.GetData();
                     if (Object.Binary_size != 0)
@@ -4352,7 +4524,7 @@ $@"
 
         static Board Brd;
 
-        static void ClearFolder(string FolderName)
+        public static void ClearFolder(string FolderName)
         {
             try
             {
@@ -4376,7 +4548,7 @@ $@"
             }
         }
 
-        static void OutputString(string text)
+        public static void OutputString(string text)
         {
             if (Program.ConsoleApp)
             {
@@ -4393,7 +4565,7 @@ $@"
             }
         }
 
-        static void OutputError(string text)
+        public static void OutputError(string text)
         {
             // always error text
             if (Program.ConsoleApp)
@@ -4435,6 +4607,7 @@ $@"
                 ShapeBasedMods = new ShapeBasedModels();
                 RegionsL       = new ObjectList<Region>();
 
+
                 OutputString("Starting");
                 ExtractFiles = extractFiles;
                 CreateLib = createLib;
@@ -4470,10 +4643,12 @@ $@"
                     System.Environment.Exit(0);
                 }
 
+                FV = new FileVersionInfo("FileVersionInfo", "", Type.text, 4);
+
                 // Initialise the PcbObjects list
                 PcbObjects = new List<PcbDocEntry>
                 {
-                    new FileVersionInfo          ("FileVersionInfo",              "",                         Type.text,   4), // not used
+                    FV,
                     new Board                    ("Board6",                       "Board",                    Type.text,   4),
                     new Rules                    ("Rules6",                       "Rule",                     Type.text,   6),
                     new AdvancedPlacerOptions    ("Advanced Placer Options6",     "AdvancedPlacerOptions",    Type.text,   4), // not used
@@ -4526,7 +4701,7 @@ $@"
                 ClearFolder(UnpackDirectory);
 
                 // change to the directory
-                Directory.SetCurrentDirectory(/*".\\" +*/ UnpackDirectory);
+                Directory.SetCurrentDirectory(UnpackDirectory);
 
                 if (MakeDir(cf.RootStorage.Name))
                 {
