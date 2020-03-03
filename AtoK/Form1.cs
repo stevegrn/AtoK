@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ConvertToKicad;
 using System.Diagnostics;
+using System.Text;
 
 namespace AtoK
 {
@@ -44,6 +45,7 @@ namespace AtoK
 
         int outputlist_width = 0;
         ArrayList lines = new ArrayList();
+        string ComboboxItems = "";
 
         public Form1()
         {
@@ -55,8 +57,18 @@ namespace AtoK
             SaveExtractedDocs.CheckState = Properties.Settings.Default.SaveDocs ? CheckState.Checked: CheckState.Unchecked;
             LibraryGen.CheckState = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
             Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
-            fileName.Text = Properties.Settings.Default.LastFile;
-            fileName.Select(fileName.Text.Length, 0); // scroll to make filename visible
+            FileHistory.Text = Properties.Settings.Default.LastFile;
+            FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
+            FileHistory.Text = FileHistory.Text;
+        
+            ComboboxItems = Properties.Settings.Default.ComboboxItems;
+            string[] Items = ComboboxItems.Split(';');
+            foreach(var item in Items)
+            {
+                if(item != "")
+                    FileHistory.Items.Insert(0, item);
+            }
+            FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;          
         }
 
         // shutdown the worker thread when the form closes
@@ -235,14 +247,6 @@ namespace AtoK
         #region User interaction
 
         /// <summary>
-        /// Close the application
-        /// </summary>
-        private void button4_Click(object sender, EventArgs e)
-        {
-            Close();
-        }
-
-        /// <summary>
 		/// toggle scrolling
 		/// </summary>
 		private void outputList_ToggleScrolling(object sender, EventArgs e)
@@ -293,8 +297,25 @@ namespace AtoK
             LibraryGen.CheckState = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
             Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
             ConvertPCBDoc.Verbose = Verbose.CheckState == CheckState.Checked;
-            fileName.Text = Properties.Settings.Default.LastFile;
-            fileName.Select(fileName.Text.Length, 0); // scroll to make filename visible
+            // only add LastFile is it's not there already
+            bool found=false;
+            foreach (var l in FileHistory.Items)
+            {
+                if ((String)l == Properties.Settings.Default.LastFile)
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                FileHistory.Items.Insert(0, Properties.Settings.Default.LastFile);
+                FileHistory.SelectedIndex = 0;
+                FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
+            }
+
+            FileHistory.Items.Add(Properties.Settings.Default.LastFile);
+            FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
         }
 
         private void Form1_Closing(object sender, FormClosingEventArgs e)
@@ -319,10 +340,34 @@ namespace AtoK
             Properties.Settings.Default.SaveDocs = SaveExtractedDocs.CheckState == CheckState.Checked;
             Properties.Settings.Default.GenLib = LibraryGen.CheckState == CheckState.Checked;
             Properties.Settings.Default.Verbose = Verbose.CheckState == CheckState.Checked;
-            Properties.Settings.Default.LastFile = fileName.Text;
+            Properties.Settings.Default.LastFile = FileHistory.Text;
+
+            string Items = "";
+
+            StringBuilder sb = new StringBuilder();
+            foreach (var item in FileHistory.Items)
+            {
+                sb.Append(item.ToString() + ";");
+            }
+            Properties.Settings.Default.ComboboxItems = sb.ToString();
+            Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
 
             // don't forget to save the settings
             Properties.Settings.Default.Save();
+        }
+
+        public bool ControlInvokeRequired(Control c, Action a)
+        {
+            if (c.InvokeRequired) c.Invoke(new MethodInvoker(delegate { a(); }));
+            else return false;
+
+            return true;
+        }
+
+        private string GetFilename()
+        {
+            if (ControlInvokeRequired(FileHistory, () => GetFilename())) return "";
+            return FileHistory.Text;
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -333,35 +378,35 @@ namespace AtoK
                 while (ConvertPCBDoc.ConvertRunning)
                     Thread.Sleep(1000);
                 t = null;
-                button1.Text = "Convert to Kicad";
+                button1.Text = "Convert";
                 EnableControls();
                 return;
             }
-            if (File.Exists(fileName.Text))
+            if (File.Exists(FileHistory.Text))
             {
                 button1.Text = "Cancel";
                 this.Update();
                 LibraryGen.Enabled = false;
                 SaveExtractedDocs.Enabled = false;
                 Verbose.Enabled = false;
-                fileName.Enabled = false;
+                FileHistory.Enabled = false;
 //                button1.Enabled = false;
                 button2.Enabled = false;
                 CleanUp.Enabled = false;
                 LaunchPCBNew.Enabled = false;
                 //start the conversion
                 Cursor.Current = Cursors.WaitCursor;
-                t = new Thread(() =>
+                t = new Thread((object Filename) =>
                 {
-                    Program.ConvertPCB.ConvertFile(fileName.Text, SaveExtractedDocs.CheckState == CheckState.Checked, LibraryGen.CheckState == CheckState.Checked);
+                    Program.ConvertPCB.ConvertFile(Filename.ToString(), SaveExtractedDocs.CheckState == CheckState.Checked, LibraryGen.CheckState == CheckState.Checked);
                 });
 
-                t.Start();
+                t.Start(FileHistory.Text);
                 timer1.Enabled = true;
                 timer1.Interval = 500;
             }
             else
-                outputList_Add("File doesn't exist", System.Drawing.Color.Red);
+                outputList_Add("File \"{FileHistory.Text}\"doesn't exist", System.Drawing.Color.Red);
         }
 
         public void EnableControls()
@@ -372,8 +417,8 @@ namespace AtoK
             SaveExtractedDocs.Update();
             Verbose.Enabled = true;
             Verbose.Update();
-            fileName.Enabled = true;
-            fileName.Update();
+            FileHistory.Enabled = true;
+            FileHistory.Update();
             button1.Enabled = true;
             button1.Update();
             button2.Enabled = true;
@@ -405,8 +450,25 @@ namespace AtoK
             };
             if (openFileDialog1.ShowDialog() == DialogResult.OK)
             {
-                fileName.Text = openFileDialog1.FileName;
-                fileName.Select(fileName.Text.Length, 0); // scroll to make filename visible
+                FileHistory.Text = openFileDialog1.FileName;
+                // only add to history if not already there
+                bool found = false;
+                foreach (var l in FileHistory.Items)
+                {
+                    if ((String)l == FileHistory.Text)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    FileHistory.Items.Insert(0, FileHistory.Text);
+                    FileHistory.SelectedIndex = 0;
+                    FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
+                }
+                FileHistory.SelectedItem = 0;
+                FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
             }
 
         }
@@ -423,7 +485,7 @@ namespace AtoK
             // set right to right of form
             control.Width = button1.Right;
             outputList.Width = this.Width-30;
-            outputList.Left = fileName.Left;
+            outputList.Left = FileHistory.Left;
             outputList.Top = Verbose.Bottom + 10;
             outputList.Height = control.Height - Verbose.Bottom - 50;
         }
@@ -441,7 +503,7 @@ namespace AtoK
                 busy.BackColor = Color.Red;
             if (t == null || t.IsAlive == false)
             {
-                button1.Text = "Convert to Kicad";
+                button1.Text = "Convert";
                 EnableControls();
                 timer1.Enabled = false;
                 Cursor.Current = Cursors.Default;
@@ -460,15 +522,15 @@ namespace AtoK
         private void LaunchPCBNew_Click(object sender, EventArgs e)
         {
             Process p = new Process();
-            if (fileName.Text != "" && File.Exists(fileName.Text))
+            if (FileHistory.Text != "" && File.Exists(FileHistory.Text))
             {
-                string UnpackDirectory = fileName.Text.Substring(0, fileName.Text.IndexOf('.')) + "-Kicad";
+                string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.IndexOf('.')) + "-Kicad";
                 UnpackDirectory = UnpackDirectory.Replace('.', '-');
                 if (Directory.Exists(UnpackDirectory))
                 {
-                    int index = fileName.Text.LastIndexOf('.');
+                    int index = FileHistory.Text.LastIndexOf('.');
                     string FileName;
-                    FileName = fileName.Text.Substring(fileName.Text.LastIndexOf('\\')+1);
+                    FileName = FileHistory.Text.Substring(FileHistory.Text.LastIndexOf('\\') + 1);
                     FileName = FileName.Substring(0, FileName.LastIndexOf('.'));
 
                     string output_filename = UnpackDirectory + "\\" + FileName + ".kicad_pcb";
@@ -477,30 +539,37 @@ namespace AtoK
                     {
                         try
                         {
-                            p.StartInfo = new ProcessStartInfo("C:\\Program Files\\KiCad\\bin\\pcbnew.exe","\""+ output_filename + "\"");
+                            p.StartInfo = new ProcessStartInfo("C:\\Program Files\\KiCad\\bin\\pcbnew.exe", "\"" + output_filename + "\"");
                             p.StartInfo.RedirectStandardOutput = false;
                             p.StartInfo.RedirectStandardError = true;
                             p.StartInfo.UseShellExecute = false;
                             p.Start();
                         }
-                        catch(System.ComponentModel.Win32Exception)
+                        catch (System.ComponentModel.Win32Exception)
                         {
                             ConvertPCBDoc.OutputError("Couldn't launch PcbNew");
                         }
                     }
+                    else
+                        ConvertPCBDoc.OutputError($"Launch failed as file \"{output_filename}\" doesn't exist");
+
                 }
             }
+            else
+                ConvertPCBDoc.OutputError($"Launch failed as file \"{FileHistory.Text}\"doesn't exist");
         }
 
         private void CleanUp_Click(object sender, EventArgs e)
         {
             ConvertPCBDoc.OutputString("Cleaning Up");
-            string UnpackDirectory = fileName.Text.Substring(0, fileName.Text.IndexOf('.')) + "-Kicad";
+            string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.IndexOf('.')) + "-Kicad";
             UnpackDirectory = UnpackDirectory.Replace('.', '-');
             if (Directory.Exists(UnpackDirectory))
             {
-                ConvertPCBDoc.OutputString($"Removing {UnpackDirectory}");
+                ConvertPCBDoc.OutputString($"Removing \"{UnpackDirectory}\"'s contents");
                 ConvertPCBDoc.ClearFolder(UnpackDirectory);
+                ConvertPCBDoc.OutputString($"Deleting {UnpackDirectory}");
+                Directory.Delete(UnpackDirectory);
             }
             else
             {
@@ -508,6 +577,53 @@ namespace AtoK
             }
         }
 
+        private void FileHistory_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            FileHistory.Text = FileHistory.Text; 
+        }
+
+        private void ClearHistory_Click(object sender, EventArgs e)
+        {
+            FileHistory.Items.Clear();
+            FileHistory.ResetText();
+            FileHistory.Items.Insert(0, FileHistory.Text);
+            FileHistory.SelectedIndex = 0;
+        }
+
+        private void Edit_Click(object sender, EventArgs e)
+        {
+            Process p = new Process();
+            if (FileHistory.Text != "" && File.Exists(FileHistory.Text))
+            {
+                string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.IndexOf('.')) + "-Kicad";
+                UnpackDirectory = UnpackDirectory.Replace('.', '-');
+                if (Directory.Exists(UnpackDirectory))
+                {
+                    int index = FileHistory.Text.LastIndexOf('.');
+                    string FileName;
+                    FileName = FileHistory.Text.Substring(FileHistory.Text.LastIndexOf('\\') + 1);
+                    FileName = FileName.Substring(0, FileName.LastIndexOf('.'));
+
+                    string output_filename = UnpackDirectory + "\\" + FileName + ".kicad_pcb";
+
+                    if (File.Exists(output_filename))
+                    {
+                        try
+                        {
+                            p.StartInfo = new ProcessStartInfo("C:\\Program Files\\Notepad++\\notepad++.exe", "\"" + output_filename + "\"");
+                            p.StartInfo.RedirectStandardOutput = false;
+                            p.StartInfo.RedirectStandardError = true;
+                            p.StartInfo.UseShellExecute = false;
+                            p.Start();
+                        }
+                        catch (System.ComponentModel.Win32Exception)
+                        {
+                            ConvertPCBDoc.OutputError("Couldn't launch PcbNew");
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

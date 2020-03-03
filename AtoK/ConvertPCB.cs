@@ -48,6 +48,31 @@ namespace ConvertToKicad
         static double originX = 0;
         static double originY = 0;
 
+        static void CheckThreadAbort(Exception Ex)
+        {
+//            int line = Convert.ToInt32(Ex.ToString().Substring(Ex.ToString().IndexOf("line")).Substring(0, Ex.ToString().Substring(Ex.ToString().IndexOf("line")).ToString().IndexOf("\r\n")).Replace("line ", ""));
+            if (Ex.Message == "Thread was being aborted.")
+            {
+                throw Ex;
+            }
+            else
+                OutputError(Ex.Message);
+        }
+
+        static void CheckThreadAbort(Exception Ex, string text)
+        {
+            //            int line = Convert.ToInt32(Ex.ToString().Substring(Ex.ToString().IndexOf("line")).Substring(0, Ex.ToString().Substring(Ex.ToString().IndexOf("line")).ToString().IndexOf("\r\n")).Replace("line ", ""));
+            if (Ex.Message == "Thread was being aborted.")
+            {
+                throw Ex;
+            }
+            else
+            {
+                OutputError(Ex.Message);
+                OutputError(text);
+            }
+        }
+
         // used to decompress the 3D models in the PcbDoc file
         static string ZlibCodecDecompress(byte[] compressed)
         {
@@ -1008,6 +1033,23 @@ namespace ConvertToKicad
                 Zone_connect = 1; // default to thermal connect 
             }
 
+            public Pad(double XSize, double YSize)
+            {
+                Number = "0";
+                Type = "thru_hole";
+                Shape = "circle";
+                X = 0;
+                Y = 0;
+                Rotation = 0;
+                SizeX = XSize;
+                SizeY = YSize;
+                Drill = 0;
+                Layer = "";
+                Width = 0;
+                Net = 0;
+                Net_name = "";
+            }
+
             override public string ToString()
             {
                 if (Shape != "octagonal")
@@ -1290,6 +1332,25 @@ namespace ConvertToKicad
                 ID++; // update for next Module
             }
 
+            // constructor for free pads sconverted to modules
+            public Module(string name, double x, double y, double xsize, double ysize, Pad Pad)
+            {
+                Name = name;
+                Tedit = "(tedit 0)";
+                Tstamp = "(tstamp 0)";
+                ID = 0;
+                Layer = "F.Cu";
+                Designator = "";
+                DesignatorOn = false;
+                Comment = "";
+                CommentOn = false;
+                X = x;
+                Y = y;
+                Rotation = 0;
+                Pads = new ObjectList<Pad>();
+                Pads.Add(Pad);
+            }
+
             void AddLine(Line line)
             {
                 Lines.Add(line);
@@ -1346,38 +1407,48 @@ namespace ConvertToKicad
 
             public override string ToString()
             {
-                string ret = "";
-                ret = $"  (module \"{Name}\" (layer {Layer}) {Tedit} {Tstamp}\n";
-                ret += $"    (at {X} {-Y} {Rotation})\n";
-                ret += $"    (attr {Attr})\n";
-
-                // this bit is for a particular test board where the idiot had put the Comment as .designator
-                foreach (var str in Strings)
+            //    OutputString($"outputting {Name}");
+                try
                 {
-                    if (str.Value.ToLower() == ".comment")
-                        str.Value = Comment;
-                    if (str.Value.ToLower() == ".designator")
-                        str.Value = Designator;
+                    string ret = "";
+                    ret = $"  (module \"{Name}\" (layer {Layer}) {Tedit} {Tstamp}\n";
+                    ret += $"    (at {X} {-Y} {Rotation})\n";
+                    ret += $"    (attr {Attr})\n";
+
+                    // this bit is for a particular test board where the idiot had put the Comment as .designator
+                    if (Strings != null)
+                        foreach (var str in Strings)
+                        {
+                            if (str.Value.ToLower() == ".comment")
+                                str.Value = Comment;
+                            if (str.Value.ToLower() == ".designator")
+                                str.Value = Designator;
+                        }
+
+                    if (Strings != null) ret += Strings.ToString(X, Y, Rotation);
+
+                    PadComparer pc = new PadComparer();
+                    // put pads in numerical order (not really necessary)
+                    Pads.Sort(pc);
+
+                    if (Pads != null) ret += Pads.ToString(X, Y, Rotation);
+                    // ret += Vias.ToString(X, Y, Rotation); // vias not allowed in modules...yet
+                    if (Lines != null) ret += Lines.ToString(X, Y, -Rotation);
+                    if (Arcs != null) ret += Arcs.ToString(X, Y, -Rotation);
+                    if (Fills != null) ret += Fills.ToString(X, Y, -Rotation);
+                    if (Polygons != null) ret += Polygons.ToString();
+                    if (Regions != null) ret += Regions.ToString(X, Y, -Rotation);
+                    CurrentLayer = Layer;
+                    if (ComponentBodies != null) ret += ComponentBodies.ToString(X, Y, Rotation); // (Layer=="F.Cu")?-Rotation:-(Rotation-180));
+                    if (ShapeBasedModels != null) ret += ShapeBasedModels.ToString(X, Y, -Rotation);
+                    ret += "  )\n";
+                    return ret;
                 }
-
-                ret += Strings.ToString(X, Y, Rotation);
-
-                PadComparer pc = new PadComparer();
-                // put pads in numerical order (not really necessary)
-                Pads.Sort(pc);
-
-                ret += Pads.ToString(X, Y, Rotation);
-                // ret += Vias.ToString(X, Y, Rotation); // vias not allowed in modules...yet
-                ret += Lines.ToString(X, Y, -Rotation);
-                ret += Arcs.ToString(X, Y, -Rotation);
-                ret += Fills.ToString(X, Y, -Rotation);
-                ret += Polygons.ToString();
-                ret += Regions.ToString(X, Y, -Rotation);
-                CurrentLayer = Layer;
-                ret += ComponentBodies.ToString(X, Y, Rotation); // (Layer=="F.Cu")?-Rotation:-(Rotation-180));
-                ret += ShapeBasedModels.ToString(X, Y, -Rotation);
-                ret += "  )\n";
-                return ret;
+                catch (Exception Ex)
+                {
+                    CheckThreadAbort(Ex);
+                    return "";
+                }
             }
 
             // output the module as a Library component
@@ -1387,7 +1458,7 @@ namespace ConvertToKicad
                 ret = $"  (module \"{Name}\" (layer {Layer}) {Tedit} {Tstamp}\n";
                 ret += $"  (descr \"\")";
                 ret += $"  (tags \"\")";
-                ret += $"  (attr {Attr})\n";
+                if(Attr != "") ret += $"  (attr {Attr})\n";
 
                 foreach (var String in Strings)
                 {
@@ -1758,7 +1829,7 @@ namespace ConvertToKicad
             public string Record { get; set; }
             public Type Type { get; set; }
             private readonly int offset;
-            public uint Binary_size { get; set; }
+            public UInt32 Binary_size { get; set; }
             private int Processed;
 
             List<byte[]> binary;
@@ -1785,9 +1856,20 @@ namespace ConvertToKicad
 
                 MemoryStream ms = new MemoryStream(data);
                 long size = ms.Length;
+                if (size == 0)
+                    return true;
 
                 UInt32 pos = 0;
+                // record consists of
+                // byte type
+                // int32 offset - this plus 5 is the offset of the next record
+                // record
+                // so record size is offset + 5
+
                 BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
+                ms.Seek(1, SeekOrigin.Begin);
+                Binary_size = (UInt32)br.ReadInt32();
+                Binary_size += 5;
                 while (pos < size)
                 {
                     ms.Seek(pos, SeekOrigin.Begin);
@@ -1956,7 +2038,7 @@ namespace ConvertToKicad
                 new VersionParam("Release 10", 141),
                 new VersionParam("Release 10", 849),
                 new VersionParam("Release 10", 849),
-                new VersionParam("Release 10 update 1", 849),
+                new VersionParam("Release 10 update 1", 141),
                 new VersionParam("Release 10 update 15", 849),
                 new VersionParam("Release 12", 849),
                 new VersionParam("Release 13", 849),
@@ -2019,7 +2101,7 @@ namespace ConvertToKicad
                             bck = str;
                             Version Version = new Version(ver, fwd, bck);
                             Versions.Add(Version);
-                            OutputString(Version.ToString());
+                            //OutputString(Version.ToString());
                         }
                     }
                  }
@@ -2153,6 +2235,7 @@ namespace ConvertToKicad
                         OriginX = originX = GetCoordinateX(ORIGINX);
                     if (ORIGINY != "")
                         OriginY = originY = GetCoordinateY(GetString(line, "ORIGINY="));
+                    OutputString($"ORIGINX={OriginX} ORIGINY={OriginY}");
                     if (ORIGINX != "" && ORIGINY != "")
                     {
                         List<string> strings = new List<string>();
@@ -2246,9 +2329,9 @@ namespace ConvertToKicad
                                     LayersL.Add(Layer);
                             }
                         }
-                        catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                        catch (Exception Ex)
                         {
-                            OutputError(Ex.ToString());
+                            CheckThreadAbort(Ex);
                         }
 
                         // now sort the list in terms of the prev,next parameters
@@ -2295,9 +2378,9 @@ namespace ConvertToKicad
                         DesignatorDisplayMode = GetString(line, "DESIGNATORDISPLAYMODE=") == "1";
                     }
                 }
-                catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                catch (Exception Ex)
                 {
-                    OutputError(Ex.ToString());
+                    CheckThreadAbort(Ex);
                 }
 
                 return true;
@@ -2528,14 +2611,21 @@ namespace ConvertToKicad
             public override string ToString()
             {
                 string ret = "";
-                for (var i = 0; i < base.Count; i++)
+                try
                 {
-                    string type = $"{base[i].GetType()}";
-                    if (type.IndexOf("Module") != -1)
+                    for (var i = 0; i < base.Count; i++)
                     {
-                        CurrentModule = i;
+                        string type = $"{base[i].GetType()}";
+                        if (type.IndexOf("Module") != -1)
+                        {
+                            CurrentModule = i;
+                        }
+                        ret += base[i].ToString();
                     }
-                    ret += base[i].ToString();
+                }
+                catch (Exception Ex)
+                {
+                    CheckThreadAbort(Ex);
                 }
                 return ret;
             }
@@ -2596,10 +2686,10 @@ namespace ConvertToKicad
                     {
                         Kind = Convert.ToInt32(param);
                     }
-                    catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                    catch (Exception Ex)
                     {
+                        CheckThreadAbort(Ex);
                         Kind = 0;
-                        OutputError(Ex.Message);
                     };
                 }
                 if ((param = GetString(line, "|SUPERCLASS=")) != "")
@@ -2711,6 +2801,11 @@ namespace ConvertToKicad
                 Module Mod = new Module(line);
                 ModulesL.Add(Mod);
                 return true;
+            }
+
+            public override void FinishOff()
+            {
+                base.FinishOff();
             }
 
         }
@@ -2921,9 +3016,9 @@ namespace ConvertToKicad
                     if (Rule.Enabled && Rule.Valid)
                         RulesL.Add(Rule);
                 }
-                catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                catch (Exception Ex)
                 {
-                    OutputError(Ex.Message);
+                    CheckThreadAbort(Ex);
                 }
                 return true;
             }
@@ -3059,6 +3154,11 @@ namespace ConvertToKicad
                 return true;
             }
 
+            public override bool ProcessFile(byte[] data)
+            {
+                return base.ProcessFile(data);
+            }
+
         }
 
         // class for the pads document entry in the pcbdoc file
@@ -3069,6 +3169,7 @@ namespace ConvertToKicad
             // Layout of memory after the pad name string
             // normally 141 bytes long but if it is a surface mount pad and it has a hole shape which is not round
             // or it has the plated attribute set then the record size becomes 737 for some bizarre reason
+            // layout for Winter 09
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
             unsafe struct PadStruct
             {
@@ -3136,119 +3237,196 @@ namespace ConvertToKicad
                 if (Binary_size == 0)
                     return false;
 
-                ;
-
                 try
                 {
                     using (MemoryStream ms = new MemoryStream(data))
                     {
                         UInt32 pos = 0;
-                        long size = ms.Length;
+                        uint size = (uint)ms.Length;
 
                         BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
                         ms.Seek(pos, SeekOrigin.Begin);
-                        while (pos < size)
-                        {
-                            base.ProcessLine();
-                            long p = pos;
-                            ms.Seek(pos, SeekOrigin.Begin);
-                            byte recordtype = br.ReadByte(); // should be 2
-                            if (recordtype != 2)
-                                OutputString($"Invalid record type {recordtype}");
-                            UInt32 next = br.ReadUInt32();
-                            uint l = br.ReadByte(); // string length
-                            uint headersize = 6 + l;
-                            string name = new string(br.ReadChars((int)l));
-                            // we are now pointing to the pad record
-                            //
-                            Layers Layer;
-                            byte shape;
-                            bool plated;
-                            byte UsePasteMaskRules;
-                            byte UseSolderMaskRules;
-                            double X, Y, XSize, YSize, HoleSize; //, MIDXSize, MIDYSize, BottomXSize, BottomYSize;
-                            double Rotation = 0;
-                            double PasteMaskExpansion;
-                            double SolderMaskExpansion;
-                            Int16 Component;
-                            Int16 Net;
-                            Int16 JumperID;
-                            int s = System.Runtime.InteropServices.Marshal.SizeOf(typeof(PadStruct));
-                            byte[] bytes = br.ReadBytes(FV.VP.PadOffset); // System.Runtime.InteropServices.Marshal.SizeOf(typeof(PadStruct)));// 141);  // read the number of bytes found in a normal record
-                            pos = (uint)ms.Position;
+                        List<UInt32> Starts = new List<UInt32>();
+                        // look for record starts
+                       {
+                            // signature is
+                            // byte 02
+                            // int32 length
+                            // byte strlen = length - 1
+                            // string strlen ascci chars
 
-                            // let's use some "unsafe" stufF
-                            PadStruct pad = ByteArrayToStructure<PadStruct>(bytes);
-
-                            Layer = (Layers)pad.Layer;
-                            Net = pad.Net;
-                            Component = pad.Component;
-                            X = ToMM(pad.X) - originX;
-                            Y = ToMM(pad.Y) - originY;
-                            XSize = ToMM(pad.XSize);
-                            YSize = ToMM(pad.YSize);
-                            HoleSize = ToMM(pad.HoleSize);
-                            shape = pad.TopShape;
-                            Rotation = pad.Rotation;
-                            plated = pad.Plated != 0;
-                            PasteMaskExpansion = ToMM(pad.PasteMaskExpansion);
-                            SolderMaskExpansion = ToMM(pad.SolderMaskExpansion);
-                            UsePasteMaskRules = pad.UsePasteMaskRules;
-                            UseSolderMaskRules = pad.UseSolderMaskRules;
-                            JumperID = pad.JumperID;
-
-                            bool InComponent = Component != -1;
-
-                            string[] shapes = { "unknown", "circle", "rect", "octagonal", "rounded" };
-                            string type;
-                            if (Layer == Layers.Multi_Layer)
+                            while (pos < size)
                             {
-                                if (plated)
+                                ms.Seek(pos, SeekOrigin.Begin);
+                                byte recordtype = br.ReadByte(); // should be 2
+                                if (recordtype == 2)
                                 {
-                                    type = "thru_hole";
+                                    // possible start
+                                    UInt32 nextnamelength = br.ReadUInt32();
+                                    if (nextnamelength < 256)
+                                    {
+                                        uint l = br.ReadByte(); // string length
+                                        if (l == nextnamelength - 1)
+                                        {
+                                            // everything ok so far
+                                            // now check bytes in string are ASCII
+                                            bool found = true;
+                                            for (int i = 0; i < l; i++)
+                                            {
+                                                byte c = br.ReadByte();
+                                                if (c < 0x20 || c > 0x7F)
+                                                    found = false;
+                                            }
+                                            if (br.ReadByte() != 1)
+                                                found = false;
+                                            if (found)
+                                            {
+                                               // OutputString($"Found header at {pos}");
+                                                Starts.Add(pos);
+                                            }
+                                        }
+                                    }
+                                }
+                                pos = pos + 1;
+                            }
+                        }
+                        pos = 0;
+                        int index = -1;
+                        Int16 Component;
+                        try
+                        {
+                            foreach (var p in Starts)
+                            {
+                                pos = p;
+                                index++;
+                                base.ProcessLine();
+                                //long p = pos;
+                                //ms.Seek(pos, SeekOrigin.Begin);
+                                ms.Seek(p, SeekOrigin.Begin);
+                                byte recordtype = br.ReadByte(); // should be 2
+                                UInt32 next = br.ReadUInt32();
+                                uint l = br.ReadByte(); // string length
+                                                        //pos =  (uint)ms.Position;
+                                string name;
+                                if (l != 0)
+                                    name = new string(br.ReadChars((int)l));
+                                else
+                                    name = "";
+                                pos = (uint)ms.Position;
+                                // find out how many bytes to read
+                                UInt32 len;
+                                if (index < Starts.Count - 1)
+                                {
+                                    len = Starts[index + 1] - Starts[index];
+                                }
+                                else
+                                    len = size - Starts[index];
+                                // we are now pointing to the pad record
+                                //
+                                Layers Layer;
+                                byte shape;
+                                bool plated;
+                                byte UsePasteMaskRules;
+                                byte UseSolderMaskRules;
+                                double X, Y, XSize, YSize, HoleSize; //, MIDXSize, MIDYSize, BottomXSize, BottomYSize;
+                                double Rotation = 0;
+                                double PasteMaskExpansion;
+                                double SolderMaskExpansion;
+                                Int16 Net;
+                                Int16 JumperID;
+                                //int s = System.Runtime.InteropServices.Marshal.SizeOf(typeof(PadStruct));
+                                byte[] bytes = br.ReadBytes((int)len); // FV.VP.PadOffset); // System.Runtime.InteropServices.Marshal.SizeOf(typeof(PadStruct)));// 141);  // read the number of bytes found in a normal record
+                                                                       // let's use some "unsafe" stufF
+                                PadStruct pad = ByteArrayToStructure<PadStruct>(bytes);
+
+                                unsafe
+                                {
+                                    if (pad.U0[0] != 1)
+                                        OutputError($"found {pad.U0[0]}");
+                                }
+                                Layer = (Layers)pad.Layer;
+                                Net = pad.Net;
+                                Net++;
+                                string n = NetsL[Net].Name;
+                                Component = pad.Component;
+                                X = ToMM(pad.X) - originX;
+                                Y = ToMM(pad.Y) - originY;
+                                XSize = ToMM(pad.XSize);
+                                YSize = ToMM(pad.YSize);
+                                HoleSize = ToMM(pad.HoleSize);
+                                shape = pad.TopShape;
+                                Rotation = pad.Rotation;
+                                plated = pad.Plated != 0;
+                                PasteMaskExpansion = ToMM(pad.PasteMaskExpansion);
+                                SolderMaskExpansion = ToMM(pad.SolderMaskExpansion);
+                                UsePasteMaskRules = pad.UsePasteMaskRules;
+                                UseSolderMaskRules = pad.UseSolderMaskRules;
+                                JumperID = pad.JumperID;
+
+                                bool InComponent = Component != -1;
+
+                                string[] shapes = { "circle", "circle", "rect", "octagonal", "rounded", "oval" };
+                                if (shapes[shape] == "circle" && XSize != YSize)
+                                    shape = 5;
+                                //       OutputString($"Pad {shapes[shape]} X={X} Y={Y} XSize={XSize} YSize={YSize}");
+                                string type;
+                                if (Layer == Layers.Multi_Layer)
+                                {
+                                    if (plated)
+                                    {
+                                        type = "thru_hole";
+                                    }
+                                    else
+                                    {
+                                        type = "np_thru_hole";
+                                        name = "\"\"";
+                                    }
+                                }
+                                else
+                                    type = "smd";
+                                string layer = Brd.GetLayer(Layer);
+                                if (type == "smd")
+                                    layer += layer == "F.Cu" ? " F.Mask F.Paste" : (layer == "B.Cu") ? " B.Mask B.Paste" : "";
+                                else
+                                    layer += " *.Mask";
+
+                                if (XSize < HoleSize | YSize < HoleSize)
+                                {
+                                    XSize = YSize = HoleSize;
+                                }
+
+                                if (!InComponent)
+                                {
+                                    Pad Pad = new Pad(name, type, shapes[shape % 4], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net);
+                                    PadsL.Add(Pad);
+                                    // free pads not allowed (at present) in PcbNew so generate a single pad module
+                                    Module M = new Module($"FreePad{ModulesL.Count}", X, Y, XSize, YSize, Pad);
+                                    ModulesL.Add(M);
+
                                 }
                                 else
                                 {
-                                    type = "np_thru_hole";
-                                    name = "\"\"";
+                                    Pad Pad = new Pad(name, type, shapes[shape % 6], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net);
+                                    try
+                                    {
+                                        ModulesL[Component].Pads.Add(Pad);
+                                    }
+                                    catch(Exception Ex)
+                                    {
+                                        CheckThreadAbort(Ex, $"At position {pos} in Pads file");
+                                    }
                                 }
                             }
-                            else
-                                type = "smd";
-                            string layer = Brd.GetLayer(Layer);
-                            if (type == "smd")
-                                layer += layer == "F.Cu" ? " F.Mask F.Paste" : (layer == "B.Cu") ? " B.Mask B.Paste" : "";
-                            else
-                                layer += " *.Mask";
-
-                            if (XSize < HoleSize | YSize < HoleSize)
-                            {
-                                XSize = YSize = HoleSize;
-                            }
-
-                            if (!InComponent)
-                            {
-                                Pad Pad = new Pad(name, type, shapes[shape % 4], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net + 1);
-                                PadsL.Add(Pad);
-                            }
-                            else
-                            {
-                                Pad Pad = new Pad(name, type, shapes[shape % 4], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net + 1);
-                                ModulesL[Component].Pads.Add(Pad);
-                            }
-
-                            // now check for abnormal record
-                            // e.g. smd pad with plated set or holeshape not round
-                            if ((pos < size) && (br.ReadByte() != 2))
-                            {
-                                pos += (737 - 141);
-                            }
+                        }
+                        catch(Exception Ex)
+                        {
+                            CheckThreadAbort(Ex);
                         }
                     }
                 }
-                catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                catch (Exception Ex)
                 {
-                    OutputError(Ex.Message);
+                    CheckThreadAbort(Ex);
                 }
 
                 return true;
@@ -3264,23 +3442,23 @@ namespace ConvertToKicad
             unsafe struct ViaStruct
             {
                 public byte Type;                   //  00 1 3 - type
-                public UInt32 Offset;                //  01 4 203 - record size
+                public UInt32 Offset;               //  01 4 203 - record size
                 public byte U0;                     //  05 1 ???
                 public byte U1;                     //  06 1 ???
                 public byte U2;                     //  07 1 ???
-                public Int16 net;                    //  08 2 net
-                public Int16 U3;                     //  0A 2 ???
-                public Int16 Component;              //  0C 2 component
-                public Int16 U4;                     //  0E 2 ???
-                public Int16 U5;                     //  10 2 ???
-                public Int32 X;                      //  12 4 X
-                public Int32 Y;                      //  16 4 Y
-                public Int32 Width;                  //  1A 4 Width
-                public Int32 Hole;                   //  1E 4 Hole
+                public Int16 net;                   //  08 2 net
+                public Int16 U3;                    //  0A 2 ???
+                public Int16 Component;             //  0C 2 component
+                public Int16 U4;                    //  0E 2 ???
+                public Int16 U5;                    //  10 2 ???
+                public Int32 X;                     //  12 4 X
+                public Int32 Y;                     //  16 4 Y
+                public Int32 Width;                 //  1A 4 Width
+                public Int32 Hole;                  //  1E 4 Hole
                 public byte StartLayer;             //  22 1 start layer
                 public byte EndLayer;               //  23 1 end layer
-                public fixed byte U7[0x50 - 0x24];     //  24 44 ???
-                public fixed Int32 LayerSizes[32];   //  50 128 pad size on layers top, mid1,...mid30, bottom 
+                public fixed byte U7[0x50 - 0x24];  //  24 44 ???
+                public fixed Int32 LayerSizes[32];  //  50 128 pad size on layers top, mid1,...mid30, bottom 
             }
 
             public Vias(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
@@ -3327,7 +3505,7 @@ namespace ConvertToKicad
         // class for the tracks document entry in the pcbdoc file
         class Tracks : PcbDocEntry
         {
-            // record length 46
+            // record length varies
             public Tracks(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
             {
                 Binary_size = 46;
@@ -3399,8 +3577,8 @@ namespace ConvertToKicad
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
             unsafe struct Text
             {
-                public byte Type;                        //   0 1 type should be 5
-                public UInt32 FontLen;                   //   1 4 FontLen
+          //      public byte Type;                        //   0 1 type should be 5
+          //      public UInt32 FontLen;                   //   1 4 FontLen
                 public byte Layer;                       //   5 1 Layer
                 public byte flags;                       //   6 1 flags
                 public fixed byte U0[5];                 //   7 5 ???
@@ -3462,12 +3640,16 @@ namespace ConvertToKicad
                     {
                         long p = 0;
                         long size = ms.Length;
-
+                        if (size == 0)
+                            return true;
                         BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
                         while (p < size)
                         {
-                            byte[] bytes = br.ReadBytes(0xEC);  // read the number of bytes up to actual text
-                            p = (uint)ms.Position;
+                            byte record_type = br.ReadByte();
+                            if (record_type != 5)
+                                break;
+                            Int32 len = br.ReadInt32();
+                            byte[] bytes = br.ReadBytes(len); // 0xEC);  // read the number of bytes up to actual text
                             // map text structure to the bytes
                             Text text = ByteArrayToStructure<Text>(bytes);
 
@@ -3483,12 +3665,13 @@ namespace ConvertToKicad
                             bool IsComment = text.IsComment != 0;
                             bool IsDesignator = text.IsDesignator != 0;
                             bool TrueType = text.TrueType != 0;
-                            UInt32 TextLen = text.StrLen;
+                            UInt32 TextLen = br.ReadUInt32();
 
-                            byte[] textbytes = br.ReadBytes((int)TextLen);
-                            p = ms.Position;
+                            byte strlen = br.ReadByte();
+                            byte[] textbytes = br.ReadBytes(strlen);
+                            p = ms.Position; // now at end of record
 
-                            string str = Encoding.UTF8.GetString(textbytes, 0, (int)TextLen);
+                            string str = Encoding.UTF8.GetString(textbytes, 0, strlen);
                             string layer = Brd.GetLayer(Layer);
 
                             str = ConvertSpecialStrings(str, Component, layer);
@@ -3559,9 +3742,9 @@ namespace ConvertToKicad
                         }
                     }
                 }
-                catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                catch (Exception Ex)
                 {
-                    OutputError(Ex.Message);
+                    CheckThreadAbort(Ex);
                 }
 
                 return true;
@@ -3878,9 +4061,9 @@ $@"
                                     RegionsL.Add(r);
                             }
                         }
-                        catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                        catch (Exception Ex)
                         {
-                            OutputError(Ex.ToString());
+                            CheckThreadAbort(Ex);
                         }
                     }
                 }
@@ -3916,9 +4099,9 @@ $@"
                         }
                     }
                 }
-                catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                catch (Exception Ex)
                 {
-                    OutputError(Ex.Message);
+                    CheckThreadAbort(Ex);
                 }
                 return true;
             }
@@ -4019,9 +4202,9 @@ $@"
                             pos += 5 + next;
                         }
                     }
-                    catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                    catch (Exception Ex)
                     {
-                        OutputError(Ex.Message);
+                        CheckThreadAbort(Ex);
                     }
                 }
                 return true;
@@ -4071,9 +4254,9 @@ $@"
                         {
                             ProcessLine(line);
                         }
-                        catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                        catch (Exception Ex)
                         {
-                            OutputError(Ex.Message);
+                            CheckThreadAbort(Ex);
                         };
                         pos += 5 + offset;
                     }
@@ -4312,9 +4495,9 @@ $@"
                         }
                     }
                 }
-                catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                catch (Exception Ex)
                 {
-                    OutputError(Ex.Message);
+                    CheckThreadAbort(Ex);
                 }
             }
 
@@ -4398,9 +4581,9 @@ $@"
                         else
                             File.Delete($"{Component}.step");
                     }
-                    catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                    catch (Exception Ex)
                     {
-                        OutputError(Ex.Message);
+                        CheckThreadAbort(Ex);
                     }
                     pos += next + 4;
                     Component++;
@@ -4454,9 +4637,9 @@ $@"
                                     file.Flush();
                                     file.Close();
                                 }
-                                catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                                catch (Exception Ex)
                                 {
-
+                                    CheckThreadAbort(Ex);
                                 }
                                 string filename = it.Name + ".dat";
                                 if (filename != "Data.dat")
@@ -4497,9 +4680,9 @@ $@"
                                 file.Flush();
                                 file.Close();
                             }
-                            catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                            catch (Exception Ex)
                             {
-                                OutputError(Ex.Message);
+                                CheckThreadAbort(Ex);
                             }
                         }
                     }
@@ -4511,9 +4694,9 @@ $@"
                     else
                         Object.ProcessFile(data);
                 }
-                catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                catch (Exception Ex)
                 {
-                    OutputError(Ex.Message);
+                    CheckThreadAbort(Ex);
                 }
 
                 Object.FinishOff();
@@ -4542,9 +4725,9 @@ $@"
                     di.Delete();
                 }
             }
-            catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+            catch (Exception Ex)
             {
-                OutputError(Ex.ToString());
+                CheckThreadAbort(Ex);
             }
         }
 
@@ -4619,8 +4802,11 @@ $@"
 
                 if (!File.Exists(filename))
                 {
-                    OutputError($"File {filename} doesn't exist");
-                    System.Environment.Exit(0);
+                    OutputError($"File \"{filename}\" doesn't exist");
+                    if (Program.ConsoleApp)
+                        System.Environment.Exit(0);
+                    else
+                        return;
                 }
 
                 if ((filename.Length - filename.IndexOf(".pcbdoc", StringComparison.OrdinalIgnoreCase)) != 7)
@@ -4723,9 +4909,9 @@ $@"
                     if (Directory.Exists("Models"))
                         Directory.Delete("Models", true);
                 }
-                catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                catch (Exception Ex)
                 {
-                    OutputError(Ex.Message);
+                    CheckThreadAbort(Ex);
                 }
                 Directory.Move(@"Root Entry\Models", "Models");
                 if(!Directory.EnumerateFileSystemEntries("Models").Any())
@@ -4930,9 +5116,9 @@ $@"
                                 file.Close();
                             }
                         }
-                        catch (Exception Ex) when (Ex.Message != "Thread was being aborted.")
+                        catch (Exception Ex)
                         {
-                            OutputError(Ex.ToString());
+                            CheckThreadAbort(Ex);
                         }
                     }
                 }
