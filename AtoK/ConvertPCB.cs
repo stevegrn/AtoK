@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using AtoK;
 using System.Threading;
+using System.Text.RegularExpressions;
 
 namespace ConvertToKicad
 {
@@ -50,7 +51,8 @@ namespace ConvertToKicad
 
         static void CheckThreadAbort(Exception Ex)
         {
-//            int line = Convert.ToInt32(Ex.ToString().Substring(Ex.ToString().IndexOf("line")).Substring(0, Ex.ToString().Substring(Ex.ToString().IndexOf("line")).ToString().IndexOf("\r\n")).Replace("line ", ""));
+            string text = Ex.ToString();
+            //int line = Convert.ToInt32(Ex.ToString().Substring(Ex.ToString().IndexOf("line")).Substring(0, Ex.ToString().Substring(Ex.ToString().IndexOf("line")).ToString().IndexOf("\r\n")).Replace("line ", ""));
             if (Ex.Message == "Thread was being aborted.")
             {
                 throw Ex;
@@ -1021,6 +1023,8 @@ namespace ConvertToKicad
                 X = x;
                 Y = y;
                 Rotation = rotation;
+                if (Rotation > 0 && Rotation < 1)
+                    Rotation = 0; // TODO fix this frig
                 SizeX = sizex;
                 SizeY = sizey;
                 Drill = drill;
@@ -2193,6 +2197,11 @@ namespace ConvertToKicad
 
             public void BoardAddLine(double x1, double y1, double x2, double y2)
             {
+                if (x1 == x2 && y1 == y2)
+                {
+                    OutputError("Rejected zero length line in boundary");
+                    return;
+                }
                 BoundaryObject Line = new BoundaryObject(x1, y1, x2, y2);
                 BoundaryObjects.Add(Line);
             }
@@ -2209,6 +2218,11 @@ namespace ConvertToKicad
 
             public void BoardAddArc(double x1, double y1, double x2, double y2, double angle)
             {
+                if (x1 == x2 && y1 == y2)
+                {
+                    OutputError("Rejected zero length arc in boundary");
+                    return;
+                }
                 BoundaryObject Arc = new BoundaryObject(x1, y1, x2, y2, angle);
                 BoundaryObjects.Add(Arc);
             }
@@ -2240,7 +2254,6 @@ namespace ConvertToKicad
                     {
                         List<string> strings = new List<string>();
                         // this is the first line in the file and contains the board outline details
-                        // TODO define Edge.Cuts from this data
                         int count = 0;
                         string search;
                         int position = 0;
@@ -2349,7 +2362,6 @@ namespace ConvertToKicad
                             }
                         }
 
-
                         bool End = false;
                         do
                         {
@@ -2439,7 +2451,7 @@ namespace ConvertToKicad
                     case Layers.Top_Overlay: return "F.SilkS";
                     case Layers.Bottom_Overlay: return "B.SilkS";
                     case Layers.Keepout_Layer: return "Margin";
-                    case Layers.Mech_1: return "Edge.Cuts";
+                    case Layers.Mech_1: return "Dwgs.User"; //"Edge.Cuts";
                     case Layers.Mech_13: return "Dwgs.User";
                     case Layers.Mech_15: return "F.CrtYd";
                     case Layers.Mech_16: return "B.CrtYd";
@@ -3397,7 +3409,7 @@ namespace ConvertToKicad
 
                                 if (!InComponent)
                                 {
-                                    Pad Pad = new Pad(name, type, shapes[shape % 4], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net);
+                                    Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net);
                                     PadsL.Add(Pad);
                                     // free pads not allowed (at present) in PcbNew so generate a single pad module
                                     Module M = new Module($"FreePad{ModulesL.Count}", X, Y, XSize, YSize, Pad);
@@ -3406,7 +3418,7 @@ namespace ConvertToKicad
                                 }
                                 else
                                 {
-                                    Pad Pad = new Pad(name, type, shapes[shape % 6], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net);
+                                    Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net);
                                     try
                                     {
                                         ModulesL[Component].Pads.Add(Pad);
@@ -3606,7 +3618,7 @@ namespace ConvertToKicad
 
             string ConvertSpecialStrings(string name, Int16 Component, string layer)
             {
-                if (name[0] == '.')
+                if (name != "" && name[0] == '.')
                 {
                     // this is a special string so reinterpret it
                     switch (name.ToLower())
@@ -3634,11 +3646,12 @@ namespace ConvertToKicad
 
                 List<UInt32> Headers = new List<UInt32>();
 
+                long p = 0;
+                Int32 len;
                 try
                 {
                     using (MemoryStream ms = new MemoryStream(data))
                     {
-                        long p = 0;
                         long size = ms.Length;
                         if (size == 0)
                             return true;
@@ -3648,7 +3661,7 @@ namespace ConvertToKicad
                             byte record_type = br.ReadByte();
                             if (record_type != 5)
                                 break;
-                            Int32 len = br.ReadInt32();
+                            len = br.ReadInt32();
                             byte[] bytes = br.ReadBytes(len); // 0xEC);  // read the number of bytes up to actual text
                             // map text structure to the bytes
                             Text text = ByteArrayToStructure<Text>(bytes);
@@ -3681,6 +3694,8 @@ namespace ConvertToKicad
                                 Height = Height / 1.86;     // fudge to get height the same as stroke font
                             }
 
+                            str = str.Replace("\r", "");
+                            str = str.Replace("\n", "\\n");
                             if (!InComponent)
                             {
                                 double Angle = (90 - Rotation) * Math.PI / 180;
@@ -4503,6 +4518,7 @@ $@"
 
             public override string ToString(double x, double y, double ModuleRotation)
             {
+                //OutputError($"Shape based model not supported # ID {ID} X={X + x} Y={Y + y} Rotation={Rotation + ModuleRotation} ROTX={ROTX} ROTY={ROTY} ROTZ={ROTZ} Type={Type}\n#{Line}\n");
                 return $"# ID {ID} X={X + x} Y={Y + y} Rotation={Rotation + ModuleRotation} ROTX={ROTX} ROTY={ROTY} ROTZ={ROTZ} Type={Type}\n#{Line}\n";
             }
         }
@@ -4873,10 +4889,9 @@ $@"
                 Brd = (Board)PcbObjects[1]; // has layer stack set up in it now
 
                 CompoundFile cf = new CompoundFile(filename);
-
-                string UnpackDirectory = filename.Substring(0, filename.IndexOf('.')) + "-Kicad";
-
-                UnpackDirectory = UnpackDirectory.Replace('.', '-');
+                OutputString($"Converting {filename}");
+                string UnpackDirectory = filename.Substring(0, filename.LastIndexOf('.')) + "-Kicad";
+                OutputString($"Output Directory \"{UnpackDirectory}\"");
                 if (!Directory.Exists(UnpackDirectory))
                 {
                     // create the output directory
@@ -4888,6 +4903,7 @@ $@"
 
                 // change to the directory
                 Directory.SetCurrentDirectory(UnpackDirectory);
+                string cd = Directory.GetCurrentDirectory();
 
                 if (MakeDir(cf.RootStorage.Name))
                 {

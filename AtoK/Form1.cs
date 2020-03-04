@@ -297,25 +297,13 @@ namespace AtoK
             LibraryGen.CheckState = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
             Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
             ConvertPCBDoc.Verbose = Verbose.CheckState == CheckState.Checked;
-            // only add LastFile is it's not there already
-            bool found=false;
-            foreach (var l in FileHistory.Items)
-            {
-                if ((String)l == Properties.Settings.Default.LastFile)
-                {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-            {
-                FileHistory.Items.Insert(0, Properties.Settings.Default.LastFile);
-                FileHistory.SelectedIndex = 0;
-                FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
-            }
+            string Combo = Properties.Settings.Default.ComboboxItems;
 
-            FileHistory.Items.Add(Properties.Settings.Default.LastFile);
-            FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
+            string[] items = Combo.Split(';');
+
+            FileHistory.Items.Clear();
+            FileHistory.Items.AddRange(items);
+            FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
         }
 
         private void Form1_Closing(object sender, FormClosingEventArgs e)
@@ -342,14 +330,17 @@ namespace AtoK
             Properties.Settings.Default.Verbose = Verbose.CheckState == CheckState.Checked;
             Properties.Settings.Default.LastFile = FileHistory.Text;
 
-            string Items = "";
-
             StringBuilder sb = new StringBuilder();
             foreach (var item in FileHistory.Items)
             {
-                sb.Append(item.ToString() + ";");
+                if(item.ToString() != "")
+                    sb.Append(item.ToString() + ";");
             }
-            Properties.Settings.Default.ComboboxItems = sb.ToString();
+            string Items = sb.ToString();
+            char[] charsToTrim = { ';' };
+            string  It = Items.Substring(0, Items.Length-1);
+            
+            Properties.Settings.Default.ComboboxItems = It;
             Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
 
             // don't forget to save the settings
@@ -379,6 +370,7 @@ namespace AtoK
                     Thread.Sleep(1000);
                 t = null;
                 button1.Text = "Convert";
+                busy.Select();
                 EnableControls();
                 return;
             }
@@ -431,12 +423,12 @@ namespace AtoK
 
         private void button2_Click(object sender, EventArgs e)
         {
+            busy.Select();
             OpenFileDialog openFileDialog1 = new OpenFileDialog
             {
 
                 InitialDirectory = @"D:\",
                 Title = "Browse Altium PCBDoc Files",
-
                 CheckFileExists = true,
                 CheckPathExists = true,
 
@@ -448,9 +440,11 @@ namespace AtoK
                 ReadOnlyChecked = true,
                 ShowReadOnly = true
             };
+            openFileDialog1.Multiselect = true;
             if (openFileDialog1.ShowDialog() == DialogResult.OK)
             {
                 FileHistory.Text = openFileDialog1.FileName;
+                FileHistory.Items.AddRange(openFileDialog1.FileNames);
                 // only add to history if not already there
                 bool found = false;
                 foreach (var l in FileHistory.Items)
@@ -521,11 +515,11 @@ namespace AtoK
 
         private void LaunchPCBNew_Click(object sender, EventArgs e)
         {
+            busy.Select();
             Process p = new Process();
             if (FileHistory.Text != "" && File.Exists(FileHistory.Text))
             {
-                string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.IndexOf('.')) + "-Kicad";
-                UnpackDirectory = UnpackDirectory.Replace('.', '-');
+                string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.LastIndexOf('.')) + "-Kicad";
                 if (Directory.Exists(UnpackDirectory))
                 {
                     int index = FileHistory.Text.LastIndexOf('.');
@@ -561,9 +555,9 @@ namespace AtoK
 
         private void CleanUp_Click(object sender, EventArgs e)
         {
+            busy.Select();
             ConvertPCBDoc.OutputString("Cleaning Up");
-            string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.IndexOf('.')) + "-Kicad";
-            UnpackDirectory = UnpackDirectory.Replace('.', '-');
+            string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.LastIndexOf('.')) + "-Kicad";
             if (Directory.Exists(UnpackDirectory))
             {
                 ConvertPCBDoc.OutputString($"Removing \"{UnpackDirectory}\"'s contents");
@@ -584,6 +578,7 @@ namespace AtoK
 
         private void ClearHistory_Click(object sender, EventArgs e)
         {
+            busy.Select();
             FileHistory.Items.Clear();
             FileHistory.ResetText();
             FileHistory.Items.Insert(0, FileHistory.Text);
@@ -592,11 +587,11 @@ namespace AtoK
 
         private void Edit_Click(object sender, EventArgs e)
         {
+            busy.Select();
             Process p = new Process();
             if (FileHistory.Text != "" && File.Exists(FileHistory.Text))
             {
-                string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.IndexOf('.')) + "-Kicad";
-                UnpackDirectory = UnpackDirectory.Replace('.', '-');
+                string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.LastIndexOf('.')) + "-Kicad";
                 if (Directory.Exists(UnpackDirectory))
                 {
                     int index = FileHistory.Text.LastIndexOf('.');
