@@ -23,6 +23,7 @@ namespace AtoK
         private delegate void UpdateOutputDelegate(string s, Color colour);
 
         private UpdateOutputDelegate updateoutputDelegate = null;
+        private Color BackColor;
 
         public void UpdateOutput(string s, Color colour)
         {
@@ -68,7 +69,7 @@ namespace AtoK
                 if(item != "")
                     FileHistory.Items.Insert(0, item);
             }
-            FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;          
+            FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
         }
 
         // shutdown the worker thread when the form closes
@@ -304,6 +305,7 @@ namespace AtoK
             FileHistory.Items.Clear();
             FileHistory.Items.AddRange(items);
             FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
+            BackColor = button1.BackColor;
         }
 
         private void Form1_Closing(object sender, FormClosingEventArgs e)
@@ -386,6 +388,8 @@ namespace AtoK
                 button2.Enabled = false;
                 CleanUp.Enabled = false;
                 LaunchPCBNew.Enabled = false;
+                Edit.Enabled = false;
+                ClearHistory.Enabled = false;
                 //start the conversion
                 Cursor.Current = Cursors.WaitCursor;
                 t = new Thread((object Filename) =>
@@ -419,6 +423,10 @@ namespace AtoK
             CleanUp.Update();
             LaunchPCBNew.Enabled = true;
             LaunchPCBNew.Update();
+            ClearHistory.Enabled = true;
+            ClearHistory.Update();
+            Edit.Enabled = false;
+            Edit.Update();
         }
 
         private void button2_Click(object sender, EventArgs e)
@@ -491,10 +499,10 @@ namespace AtoK
 
         private void timer1_Tick(object sender, EventArgs e)
         {
-            if (busy.BackColor == Color.Red)
-                busy.BackColor = Color.White;
+            if (button1.BackColor == Color.Green)
+                button1.BackColor = BackColor;
             else
-                busy.BackColor = Color.Red;
+                button1.BackColor = Color.Green;
             if (t == null || t.IsAlive == false)
             {
                 button1.Text = "Convert";
@@ -504,12 +512,15 @@ namespace AtoK
                 busy.Enabled = false;
                 busy.Visible = false;
                 busy.Hide();
+                Edit.Enabled = true;
+                ClearHistory.Enabled = true;
+                button1.BackColor = BackColor;
                 this.Update();
             }
             else
             {
                 busy.Enabled = true;
-                busy.Visible = true;
+                busy.Visible = false;
             }
         }
 
@@ -547,6 +558,10 @@ namespace AtoK
                     else
                         ConvertPCBDoc.OutputError($"Launch failed as file \"{output_filename}\" doesn't exist");
 
+                }
+                else
+                {
+                    ConvertPCBDoc.OutputError($"Directory \"{UnpackDirectory}\" doesn't exist");
                 }
             }
             else

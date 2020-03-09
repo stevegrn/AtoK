@@ -52,13 +52,16 @@ namespace ConvertToKicad
         static void CheckThreadAbort(Exception Ex)
         {
             string text = Ex.ToString();
-            //int line = Convert.ToInt32(Ex.ToString().Substring(Ex.ToString().IndexOf("line")).Substring(0, Ex.ToString().Substring(Ex.ToString().IndexOf("line")).ToString().IndexOf("\r\n")).Replace("line ", ""));
+            int index = text.IndexOf("line");
+            string line = text.Substring(index);
+//            int index = 
+//            int line = Convert.ToInt32(text.Substring(text.IndexOf("line")).Substring(0, text.Substring(text.IndexOf("line")).ToString().IndexOf("\r\n")).Replace("line ", ""));
             if (Ex.Message == "Thread was being aborted.")
             {
                 throw Ex;
             }
             else
-                OutputError(Ex.Message);
+                OutputError(Ex.Message+$" at { line}");
         }
 
         static void CheckThreadAbort(Exception Ex, string text)
@@ -991,6 +994,7 @@ namespace ConvertToKicad
             double Drill { get; set; }
             string Layer { get; set; }
             double Width { get; set; }
+            double RRatio { get; set; }
             int Net { get; set; }
             string Net_name { get; set; }
             private readonly int Zone_connect;
@@ -1010,9 +1014,10 @@ namespace ConvertToKicad
                 Width = 0;
                 Net = 0;
                 Net_name = "";
+                RRatio = 0;
             }
 
-            public Pad(string number, string type, string shape, double x, double y, double rotation, double sizex, double sizey, double drill, string layer, int net)
+            public Pad(string number, string type, string shape, double x, double y, double rotation, double sizex, double sizey, double drill, string layer, int net, double rratio)
             {
                 if (number == "")
                     number = "0";
@@ -1020,6 +1025,7 @@ namespace ConvertToKicad
 
                 Type = type;
                 Shape = shape;
+                RRatio = rratio;
                 X = x;
                 Y = y;
                 Rotation = rotation;
@@ -1056,15 +1062,21 @@ namespace ConvertToKicad
 
             override public string ToString()
             {
-                if (Shape != "octagonal")
+                if (Shape == "roundrect")
                 {
                     return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
+                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
                 }
                 else
+                if (Shape == "octagonal")
                 {
                     // make octagonal pad out of polygon
                     return DoOctagonalPad(Number, Type, X, Y, Rotation, SizeX, SizeY, Layer);
+                }
+                else
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
                 }
             }
 
@@ -1104,15 +1116,21 @@ namespace ConvertToKicad
             {
                 Point2D p = new Point2D(X - x, Y - y);
 
-                if (Shape != "octagonal")
+                if (Shape == "roundrect")
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
                 }
                 else
+                if (Shape == "octagonal")
                 {
                     // make octagonal pad out of polygon
                     return DoOctagonalPad(Number, Type, p.X, -p.Y, Rotation, SizeX, SizeY, Layer);
+                }
+                else
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
                 }
             }
 
@@ -1123,15 +1141,20 @@ namespace ConvertToKicad
 
                 p.Rotate(-ModuleRotation);
 
-                if (Shape != "octagonal")
+                if (Shape == "roundrect")
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                        $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
                 }
-                else
+                if (Shape == "octagonal")
                 {
                     // make octagonal pad out of polygon
                     return DoOctagonalPad(Number, Type, p.X, -p.Y, Rotation, SizeX, SizeY, Layer);
+                }
+                else
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                        $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
                 }
             }
 
@@ -1351,8 +1374,10 @@ namespace ConvertToKicad
                 X = x;
                 Y = y;
                 Rotation = 0;
-                Pads = new ObjectList<Pad>();
-                Pads.Add(Pad);
+                Pads = new ObjectList<Pad>
+                {
+                    Pad
+                };
             }
 
             void AddLine(Line line)
@@ -2018,7 +2043,7 @@ namespace ConvertToKicad
 
             public VersionParam VP { get; set; }
 
-            static List<VersionParam> VersionParamL = new List<VersionParam>
+            static readonly List<VersionParam> VersionParamL = new List<VersionParam>
             {
                 new VersionParam("FileVersionInfo", 141),
                 new VersionParam("6.3", 141),
@@ -3233,7 +3258,9 @@ namespace ConvertToKicad
                 public fixed byte U12[6];       // 135 6 ???
                 public fixed int MidLayerXSize[29]; // 141 29*4 Midlayers 2-30
                 public fixed int MidLayerYSixe[29]; // 257 29*4 MidLayers 2-30
-                public fixed byte U13[849 - 373];   // 373
+                public fixed byte U13[705 - 373];   // 373
+                public fixed byte RRatios[32];      // 705 RRatios for top, middle 30, and bottom layers
+                public fixed byte U14[849 - 737];   // 737
 
             }
 
@@ -3248,6 +3275,7 @@ namespace ConvertToKicad
             {
                 if (Binary_size == 0)
                     return false;
+
 
                 try
                 {
@@ -3266,7 +3294,7 @@ namespace ConvertToKicad
                             // int32 length
                             // byte strlen = length - 1
                             // string strlen ascci chars
-
+                            // bytes 01 00 00 00
                             while (pos < size)
                             {
                                 ms.Seek(pos, SeekOrigin.Begin);
@@ -3291,9 +3319,17 @@ namespace ConvertToKicad
                                             }
                                             if (br.ReadByte() != 1)
                                                 found = false;
+                                            if (br.ReadByte() != 0)
+                                                found = false;
+                                            if (br.ReadByte() != 0)
+                                                found = false;
+                                            if (br.ReadByte() != 0)
+                                                found = false;
+                                            if (br.ReadByte() != 0)
+                                                found = false;
                                             if (found)
                                             {
-                                               // OutputString($"Found header at {pos}");
+                                                OutputString($"Found header at {pos}");
                                                 Starts.Add(pos);
                                             }
                                         }
@@ -3305,6 +3341,8 @@ namespace ConvertToKicad
                         pos = 0;
                         int index = -1;
                         Int16 Component;
+                        byte[] r = br.ReadBytes(2);
+
                         try
                         {
                             foreach (var p in Starts)
@@ -3344,11 +3382,22 @@ namespace ConvertToKicad
                                 double Rotation = 0;
                                 double PasteMaskExpansion;
                                 double SolderMaskExpansion;
+                                double RRatio = 0;
                                 Int16 Net;
                                 Int16 JumperID;
-                                //int s = System.Runtime.InteropServices.Marshal.SizeOf(typeof(PadStruct));
-                                byte[] bytes = br.ReadBytes((int)len); // FV.VP.PadOffset); // System.Runtime.InteropServices.Marshal.SizeOf(typeof(PadStruct)));// 141);  // read the number of bytes found in a normal record
-                                                                       // let's use some "unsafe" stufF
+                                byte[] bytes = br.ReadBytes((int)len-6); // get record after header stuff
+                                if (p == 0)
+                                    r = bytes; // get reference bytes
+                                string text = "";
+                                int count = 0;
+                                foreach(var c in bytes)
+                                {
+                                    if(r[count] != bytes[count])
+                                        text += $"->{count}";
+                                    text += $" {c:X2}";
+                                    count++;
+                                }
+                                OutputString($"{pos:X8} " + text);
                                 PadStruct pad = ByteArrayToStructure<PadStruct>(bytes);
 
                                 unsafe
@@ -3374,13 +3423,19 @@ namespace ConvertToKicad
                                 UsePasteMaskRules = pad.UsePasteMaskRules;
                                 UseSolderMaskRules = pad.UseSolderMaskRules;
                                 JumperID = pad.JumperID;
-
+                                RRatio = 0;
+                                if (len > 709)
+                                unsafe
+                                {
+                                    RRatio = (double)pad.RRatios[0] / 200;
+                                }
                                 bool InComponent = Component != -1;
 
-                                string[] shapes = { "circle", "circle", "rect", "octagonal", "rounded", "oval" };
+                                if (len == 744) // i.e. is this a rounded rectangle pad?
+                                    shape = 5; // this seems a frig as the pad shape is set 1 when it should be 5
+                                string[] shapes = { "circle", "circle", "rect", "octagonal", "oval", "roundrect" };
                                 if (shapes[shape] == "circle" && XSize != YSize)
-                                    shape = 5;
-                                //       OutputString($"Pad {shapes[shape]} X={X} Y={Y} XSize={XSize} YSize={YSize}");
+                                    shape = 4;
                                 string type;
                                 if (Layer == Layers.Multi_Layer)
                                 {
@@ -3409,7 +3464,7 @@ namespace ConvertToKicad
 
                                 if (!InComponent)
                                 {
-                                    Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net);
+                                    Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net, RRatio);
                                     PadsL.Add(Pad);
                                     // free pads not allowed (at present) in PcbNew so generate a single pad module
                                     Module M = new Module($"FreePad{ModulesL.Count}", X, Y, XSize, YSize, Pad);
@@ -3418,7 +3473,7 @@ namespace ConvertToKicad
                                 }
                                 else
                                 {
-                                    Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net);
+                                    Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net, RRatio);
                                     try
                                     {
                                         ModulesL[Component].Pads.Add(Pad);
@@ -3482,6 +3537,7 @@ namespace ConvertToKicad
             {
                 Layers StartLayer, EndLayer;
                 double X, Y, Width, HoleSize;
+                double RRatio = 0;
                 Int16 Component;
                 Int16 Net;
                 ViaStruct via = ByteArrayToStructure<ViaStruct>(line);
@@ -3506,7 +3562,7 @@ namespace ConvertToKicad
                 else
                 {
                     // can't have vias in components in Kicad (yet) so add as a pad
-                    Pad Pad = new Pad("0", "thru_hole", "circle", X, Y, 0, Width, Width, HoleSize, "*.Cu", Net);
+                    Pad Pad = new Pad("0", "thru_hole", "circle", X, Y, 0, Width, Width, HoleSize, "*.Cu", Net, RRatio);
                     ModulesL[Component].Pads.Add(Pad);
                 }
                 return true;
@@ -5138,6 +5194,7 @@ $@"
                         }
                     }
                 }
+                cf.Close();
                 Directory.SetCurrentDirectory("..\\");
                 OutputString("Finished");
             }
