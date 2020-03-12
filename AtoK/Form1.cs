@@ -55,18 +55,19 @@ namespace AtoK
             InitializeComponent();
 
             outputList_Initialize();
-            SaveExtractedDocs.CheckState = Properties.Settings.Default.SaveDocs ? CheckState.Checked: CheckState.Unchecked;
+            FileHistory_Initialize();
+            SaveExtractedDocs.CheckState = Properties.Settings.Default.SaveDocs ? CheckState.Checked : CheckState.Unchecked;
             LibraryGen.CheckState = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
             Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
             FileHistory.Text = Properties.Settings.Default.LastFile;
             FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
             FileHistory.Text = FileHistory.Text;
-        
+
             ComboboxItems = Properties.Settings.Default.ComboboxItems;
             string[] Items = ComboboxItems.Split(';');
-            foreach(var item in Items)
+            foreach (var item in Items)
             {
-                if(item != "")
+                if (item != "")
                     FileHistory.Items.Insert(0, item);
             }
             FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
@@ -83,6 +84,23 @@ namespace AtoK
         bool scrolling = true;
 
         ContextMenu popUpMenu;
+        ContextMenu ComboBoxMenu;
+
+        private void FileHistory_Delete(object sender, EventArgs e)
+        {
+            // delete the selected item
+
+        }
+
+        private void FileHistory_Initialize()
+        {
+            ComboBoxMenu = new ContextMenu();
+            ComboBoxMenu.MenuItems.Add("&Delete", new EventHandler(FileHistory_Delete));
+            popUpMenu.MenuItems[0].Visible = true;
+            popUpMenu.MenuItems[0].Enabled = true;
+            popUpMenu.MenuItems[0].Shortcut = Shortcut.CtrlX;
+            popUpMenu.MenuItems[0].ShowShortcut = true;
+        }
 
         public Line outputList_Add(string str, Color color)
         {
@@ -277,7 +295,7 @@ namespace AtoK
 
         private void Form1_Load(object sender, EventArgs e)
         {
-             updateoutputDelegate = new UpdateOutputDelegate(UpdateOutput);
+            updateoutputDelegate = new UpdateOutputDelegate(UpdateOutput);
 
             if (!isFormFullyVisible(Properties.Settings.Default.F1Location, Properties.Settings.Default.F1Size) || Properties.Settings.Default.F1Size.Width == 0 || Properties.Settings.Default.F1Size.Height == 0)
             {
@@ -310,7 +328,7 @@ namespace AtoK
 
         private void Form1_Closing(object sender, FormClosingEventArgs e)
         {
-            if ( t != null && t.IsAlive)
+            if (t != null && t.IsAlive)
             {
                 t.Abort();
             }
@@ -335,13 +353,13 @@ namespace AtoK
             StringBuilder sb = new StringBuilder();
             foreach (var item in FileHistory.Items)
             {
-                if(item.ToString() != "")
+                if (item.ToString() != "")
                     sb.Append(item.ToString() + ";");
             }
             string Items = sb.ToString();
             char[] charsToTrim = { ';' };
-            string  It = Items.Substring(0, Items.Length-1);
-            
+            string It = Items.Substring(0, Items.Length - 1);
+
             Properties.Settings.Default.ComboboxItems = It;
             Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
 
@@ -384,7 +402,7 @@ namespace AtoK
                 SaveExtractedDocs.Enabled = false;
                 Verbose.Enabled = false;
                 FileHistory.Enabled = false;
-//                button1.Enabled = false;
+                //                button1.Enabled = false;
                 button2.Enabled = false;
                 CleanUp.Enabled = false;
                 LaunchPCBNew.Enabled = false;
@@ -441,7 +459,7 @@ namespace AtoK
                 CheckPathExists = true,
 
                 DefaultExt = "pcbdoc",
-                Filter = "pcb files (*.pcbdoc)|*.pcbdoc",
+                Filter = "pcb files (*.pcbdoc)|*.pcbdoc|Circuitmaker files (*.cmpcbdoc):|*.cmpcbdoc",
                 FilterIndex = 2,
                 RestoreDirectory = true,
 
@@ -486,7 +504,7 @@ namespace AtoK
             // set left to left of form
             // set right to right of form
             control.Width = button1.Right;
-            outputList.Width = this.Width-30;
+            outputList.Width = this.Width - 30;
             outputList.Left = FileHistory.Left;
             outputList.Top = Verbose.Bottom + 10;
             outputList.Height = control.Height - Verbose.Bottom - 50;
@@ -588,7 +606,7 @@ namespace AtoK
 
         private void FileHistory_SelectedIndexChanged(object sender, EventArgs e)
         {
-            FileHistory.Text = FileHistory.Text; 
+            FileHistory.Text = FileHistory.Text;
         }
 
         private void ClearHistory_Click(object sender, EventArgs e)
@@ -632,6 +650,24 @@ namespace AtoK
                         }
                     }
                 }
+            }
+        }
+
+        private void FileHistory_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Delete && FileHistory.DroppedDown)
+            {
+                //Remove the listitem from the combobox list
+                FileHistory.Items.RemoveAt(FileHistory.SelectedIndex);
+
+                //Make sure no other processing happens, ex: deleting text from combobox
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Down && !FileHistory.DroppedDown)
+            {
+                //If the down arrow is pressed show the dropdown list from the combobox
+                FileHistory.DroppedDown = true;
+
             }
         }
     }

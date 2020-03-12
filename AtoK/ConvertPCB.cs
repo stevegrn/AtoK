@@ -9,12 +9,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using AtoK;
 using System.Threading;
-using System.Text.RegularExpressions;
 
 namespace ConvertToKicad
 {
 
-    public class ConvertPCBDoc
+    public partial class ConvertPCBDoc
     {
         public static bool ConvertRunning = false;
         const int Precision = 3; // after the decimal point precision i.e. 3 digits
@@ -142,6 +141,14 @@ namespace ConvertToKicad
             double C = Convert.ToDouble(c) * 25.4 / 1000.0;
             return Math.Round(C - originY, Precision);
         }
+
+        // return the length of a track
+        static double Length(double x1, double y1, double x2, double y2)
+        {
+            return Math.Sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+        }
+
+
 
         static string ToLiteral(string input)
         {
@@ -980,204 +987,6 @@ namespace ConvertToKicad
             }
         }
 
-        // class for pad objects
-        class Pad : Object
-        {
-            public string Number { get; set; }
-            string Type { get; set; }
-            string Shape { get; set; }
-            double X { get; set; }
-            double Y { get; set; }
-            public double Rotation { get; set; }
-            double SizeX { get; set; }
-            double SizeY { get; set; }
-            double Drill { get; set; }
-            string Layer { get; set; }
-            double Width { get; set; }
-            double RRatio { get; set; }
-            int Net { get; set; }
-            string Net_name { get; set; }
-            private readonly int Zone_connect;
-
-            private Pad()
-            {
-                Number = "0";
-                Type = "thru_hole";
-                Shape = "circle";
-                X = 0;
-                Y = 0;
-                Rotation = 0;
-                SizeX = 0;
-                SizeY = 0;
-                Drill = 0;
-                Layer = "";
-                Width = 0;
-                Net = 0;
-                Net_name = "";
-                RRatio = 0;
-            }
-
-            public Pad(string number, string type, string shape, double x, double y, double rotation, double sizex, double sizey, double drill, string layer, int net, double rratio)
-            {
-                if (number == "")
-                    number = "0";
-                Number = number;
-
-                Type = type;
-                Shape = shape;
-                RRatio = rratio;
-                X = x;
-                Y = y;
-                Rotation = rotation;
-                if (Rotation > 0 && Rotation < 1)
-                    Rotation = 0; // TODO fix this frig
-                SizeX = sizex;
-                SizeY = sizey;
-                Drill = drill;
-                Layer = layer;
-                Net = net;
-                if (Net == -1)
-                    Net = 0;
-                Net_name = $"\"{NetsL[Net].Name}\"";
-                // TODO should get this from rules
-                Zone_connect = 1; // default to thermal connect 
-            }
-
-            public Pad(double XSize, double YSize)
-            {
-                Number = "0";
-                Type = "thru_hole";
-                Shape = "circle";
-                X = 0;
-                Y = 0;
-                Rotation = 0;
-                SizeX = XSize;
-                SizeY = YSize;
-                Drill = 0;
-                Layer = "";
-                Width = 0;
-                Net = 0;
-                Net_name = "";
-            }
-
-            override public string ToString()
-            {
-                if (Shape == "roundrect")
-                {
-                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
-                }
-                else
-                if (Shape == "octagonal")
-                {
-                    // make octagonal pad out of polygon
-                    return DoOctagonalPad(Number, Type, X, Y, Rotation, SizeX, SizeY, Layer);
-                }
-                else
-                {
-                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
-                }
-            }
-
-            private string DoOctagonalPad(string Number, string Type, double X, double Y, double Rotation, double SizeX, double SizeY, string Layer)
-            {
-                double Cx, Cy;
-
-                Cx = -SizeX / 2;
-                Cy = -SizeY / 2;
-                double Size = (SizeX < SizeY) ? SizeX : SizeY;
-                double dl = Size / 4;
-                string hole = $"(drill {Drill})";
-
-                if (Type == "smd")
-                    hole = "";
-
-                // make octagonal pad out of polygon
-                string
-                ret = $"    (pad {Number} {Type} custom (at {X} {Y}  {Rotation}) (size {Size} {Size}) {hole} (layers {Layer})\n";
-                ret += $"      (net {Net} {Net_name}) (zone_connect {Zone_connect})";
-                ret += $"      (zone_connect {Zone_connect})\n"; // 0=none 1=thermal 2=solid get from rules
-                ret += $"      (options (clearance outline) (anchor rect))\n";
-                ret += $"      (primitives\n";
-                ret += $"         (gr_poly (pts\n";
-                ret += $"         (xy {Cx} {-(Cy + dl)})\n";
-                ret += $"         (xy {Cx + dl} {-Cy})\n";
-                ret += $"         (xy {Cx + SizeX - dl} {-Cy})\n";
-                ret += $"         (xy {Cx + SizeX} {-(Cy + dl)})\n";
-                ret += $"         (xy {Cx + SizeX} {-(Cy + SizeY - dl)})\n";
-                ret += $"         (xy {Cx + SizeX - dl} {-(Cy + SizeY)})\n";
-                ret += $"         (xy {Cx + dl} {-(Cy + SizeY)})\n";
-                ret += $"         (xy {Cx} {-(Cy + SizeY - dl)})\n      )))\n    )\n";
-                return ret;
-            }
-
-            public string ToString(double x, double y)
-            {
-                Point2D p = new Point2D(X - x, Y - y);
-
-                if (Shape == "roundrect")
-                {
-                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
-                }
-                else
-                if (Shape == "octagonal")
-                {
-                    // make octagonal pad out of polygon
-                    return DoOctagonalPad(Number, Type, p.X, -p.Y, Rotation, SizeX, SizeY, Layer);
-                }
-                else
-                {
-                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
-                }
-            }
-
-            public override string ToString(double x, double y, double ModuleRotation)
-            {
-                // point relative to module's centre
-                Point2D p = new Point2D(X - x, Y - y);
-
-                p.Rotate(-ModuleRotation);
-
-                if (Shape == "roundrect")
-                {
-                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
-                }
-                if (Shape == "octagonal")
-                {
-                    // make octagonal pad out of polygon
-                    return DoOctagonalPad(Number, Type, p.X, -p.Y, Rotation, SizeX, SizeY, Layer);
-                }
-                else
-                {
-                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                        $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
-                }
-            }
-
-            public string ToModuleString(double x, double y, double ModuleRotation)
-            {
-                // point relative to modules centre
-                Point2D p = new Point2D(X - x, Y - y);
-
-                p.Rotate(-ModuleRotation);
-
-                if (Shape != "octagonal")
-                {
-                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation + ModuleRotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                        $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
-                }
-                else
-                {
-                    // make octagonal pad out of polygon
-                    return DoOctagonalPad(Number, Type, p.X, -p.Y, Rotation + ModuleRotation, SizeX, SizeY, Layer);
-                }
-            }
-        }
-
         // class for component body objects
         class ComponentBody : Object
         {
@@ -1841,7 +1650,7 @@ namespace ConvertToKicad
         }
 
         // convert byte array to structure
-        static unsafe T ByteArrayToStructure<T>(byte[] bytes) where T : struct
+        public static unsafe T ByteArrayToStructure<T>(byte[] bytes) where T : struct
         {
             fixed (byte* ptr = &bytes[0])
             {
@@ -2222,11 +2031,12 @@ namespace ConvertToKicad
 
             public void BoardAddLine(double x1, double y1, double x2, double y2)
             {
-                if (x1 == x2 && y1 == y2)
+                if (Length(x1, y1, x2, y2) <= 0.001)
                 {
-                    OutputError("Rejected zero length line in boundary");
+                    OutputError($"Rejected zero length line in boundary at {x1} {y1}");
                     return;
                 }
+                board_outline += $"  (gr_line (start {x1} {-y1}) (end {x2} {-y2}) (layer Edge.Cuts) (width 0.05))\n";
                 BoundaryObject Line = new BoundaryObject(x1, y1, x2, y2);
                 BoundaryObjects.Add(Line);
             }
@@ -2332,7 +2142,7 @@ namespace ConvertToKicad
                             count++;
                             if (Kind == "0")
                             {
-                                board_outline += $"  (gr_line (start {x} {-y}) (end {nx} {-ny}) (layer Edge.Cuts) (width 0.05))\n";
+                                //board_outline += $"  (gr_line (start {x} {-y}) (end {nx} {-ny}) (layer Edge.Cuts) (width 0.05))\n";
                                 BoardAddLine(x, y, nx, ny);
                             }
                             else
@@ -2428,9 +2238,10 @@ namespace ConvertToKicad
             {
                 string Layers = "";
                 int i = 0;
-                foreach (var Layer in OrderedLayers)
+                foreach (Layer Layer in OrderedLayers)
                 {
-                    string Type = (Layer.Name.Substring(0, Precision) == "Int") ? "power" : "signal";
+                    string Type = "";
+                    Type = (Layer.AltiumName.Substring(0, Precision) == "Int") ? "power" : "signal";
                     Layers += $"    ({i++} {Layer.PcbNewLayer} {Type})\n";
                 }
                 return Layers;
@@ -3198,6 +3009,204 @@ namespace ConvertToKicad
 
         }
 
+        // class for pad objects
+        class Pad : Object
+        {
+            public string Number { get; set; }
+            string Type { get; set; }
+            string Shape { get; set; }
+            double X { get; set; }
+            double Y { get; set; }
+            public double Rotation { get; set; }
+            double SizeX { get; set; }
+            double SizeY { get; set; }
+            double Drill { get; set; }
+            string Layer { get; set; }
+            double Width { get; set; }
+            double RRatio { get; set; }
+            int Net { get; set; }
+            string Net_name { get; set; }
+            private readonly int Zone_connect;
+
+            private Pad()
+            {
+                Number = "0";
+                Type = "thru_hole";
+                Shape = "circle";
+                X = 0;
+                Y = 0;
+                Rotation = 0;
+                SizeX = 0;
+                SizeY = 0;
+                Drill = 0;
+                Layer = "";
+                Width = 0;
+                Net = 0;
+                Net_name = "";
+                RRatio = 0;
+            }
+
+            public Pad(string number, string type, string shape, double x, double y, double rotation, double sizex, double sizey, double drill, string layer, int net, double rratio)
+            {
+                if (number == "")
+                    number = "0";
+                Number = number;
+
+                Type = type;
+                Shape = shape;
+                RRatio = rratio;
+                X = x;
+                Y = y;
+                Rotation = rotation;
+                if (Rotation > 0 && Rotation < 1)
+                    Rotation = 0; // TODO fix this frig
+                SizeX = sizex;
+                SizeY = sizey;
+                Drill = drill;
+                Layer = layer;
+                Net = net;
+                if (Net == -1)
+                    Net = 0;
+                Net_name = $"\"{NetsL[Net].Name}\"";
+                // TODO should get this from rules
+                Zone_connect = 1; // default to thermal connect 
+            }
+
+            public Pad(double XSize, double YSize)
+            {
+                Number = "0";
+                Type = "thru_hole";
+                Shape = "circle";
+                X = 0;
+                Y = 0;
+                Rotation = 0;
+                SizeX = XSize;
+                SizeY = YSize;
+                Drill = 0;
+                Layer = "";
+                Width = 0;
+                Net = 0;
+                Net_name = "";
+            }
+
+            override public string ToString()
+            {
+                if (Shape == "roundrect")
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
+                }
+                else
+                if (Shape == "octagonal")
+                {
+                    // make octagonal pad out of polygon
+                    return DoOctagonalPad(Number, Type, X, Y, Rotation, SizeX, SizeY, Layer);
+                }
+                else
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
+                }
+            }
+
+            private string DoOctagonalPad(string Number, string Type, double X, double Y, double Rotation, double SizeX, double SizeY, string Layer)
+            {
+                double Cx, Cy;
+
+                Cx = -SizeX / 2;
+                Cy = -SizeY / 2;
+                double Size = (SizeX < SizeY) ? SizeX : SizeY;
+                double dl = Size / 4;
+                string hole = $"(drill {Drill})";
+
+                if (Type == "smd")
+                    hole = "";
+
+                // make octagonal pad out of polygon
+                string
+                ret = $"    (pad {Number} {Type} custom (at {X} {Y}  {Rotation}) (size {Size} {Size}) {hole} (layers {Layer})\n";
+                ret += $"      (net {Net} {Net_name}) (zone_connect {Zone_connect})";
+                ret += $"      (zone_connect {Zone_connect})\n"; // 0=none 1=thermal 2=solid get from rules
+                ret += $"      (options (clearance outline) (anchor rect))\n";
+                ret += $"      (primitives\n";
+                ret += $"         (gr_poly (pts\n";
+                ret += $"         (xy {Cx} {-(Cy + dl)})\n";
+                ret += $"         (xy {Cx + dl} {-Cy})\n";
+                ret += $"         (xy {Cx + SizeX - dl} {-Cy})\n";
+                ret += $"         (xy {Cx + SizeX} {-(Cy + dl)})\n";
+                ret += $"         (xy {Cx + SizeX} {-(Cy + SizeY - dl)})\n";
+                ret += $"         (xy {Cx + SizeX - dl} {-(Cy + SizeY)})\n";
+                ret += $"         (xy {Cx + dl} {-(Cy + SizeY)})\n";
+                ret += $"         (xy {Cx} {-(Cy + SizeY - dl)})\n      )))\n    )\n";
+                return ret;
+            }
+
+            public string ToString(double x, double y)
+            {
+                Point2D p = new Point2D(X - x, Y - y);
+
+                if (Shape == "roundrect")
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
+                }
+                else
+                if (Shape == "octagonal")
+                {
+                    // make octagonal pad out of polygon
+                    return DoOctagonalPad(Number, Type, p.X, -p.Y, Rotation, SizeX, SizeY, Layer);
+                }
+                else
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
+                }
+            }
+
+            public override string ToString(double x, double y, double ModuleRotation)
+            {
+                // point relative to module's centre
+                Point2D p = new Point2D(X - x, Y - y);
+
+                p.Rotate(-ModuleRotation);
+
+                if (Shape == "roundrect")
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
+                }
+                if (Shape == "octagonal")
+                {
+                    // make octagonal pad out of polygon
+                    return DoOctagonalPad(Number, Type, p.X, -p.Y, Rotation, SizeX, SizeY, Layer);
+                }
+                else
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                        $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
+                }
+            }
+
+            public string ToModuleString(double x, double y, double ModuleRotation)
+            {
+                // point relative to modules centre
+                Point2D p = new Point2D(X - x, Y - y);
+
+                p.Rotate(-ModuleRotation);
+
+                if (Shape != "octagonal")
+                {
+                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation + ModuleRotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                        $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
+                }
+                else
+                {
+                    // make octagonal pad out of polygon
+                    return DoOctagonalPad(Number, Type, p.X, -p.Y, Rotation + ModuleRotation, SizeX, SizeY, Layer);
+                }
+            }
+        }
+
         // class for the pads document entry in the pcbdoc file
         class Pads : PcbDocEntry
         {
@@ -3271,12 +3280,20 @@ namespace ConvertToKicad
                 Binary_size = 1;
             }
 
+            private static void AddText(FileStream fs, string value)
+            {
+                byte[] info = new UTF8Encoding(true).GetBytes(value);
+                fs.Write(info, 0, info.Length);
+            }
+
             public override bool ProcessBinaryFile(byte[] data)
             {
                 if (Binary_size == 0)
                     return false;
 
-
+                FileStream TextFile = null;
+                if (ExtractFiles)
+                    TextFile = File.Open("Data.txt", FileMode.OpenOrCreate);
                 try
                 {
                     using (MemoryStream ms = new MemoryStream(data))
@@ -3329,7 +3346,7 @@ namespace ConvertToKicad
                                                 found = false;
                                             if (found)
                                             {
-                                                OutputString($"Found header at {pos}");
+                                               // OutputString($"Found header at {pos}");
                                                 Starts.Add(pos);
                                             }
                                         }
@@ -3345,6 +3362,36 @@ namespace ConvertToKicad
 
                         try
                         {
+                            UInt32 Longest = 0;
+                            UInt32 len;
+                            foreach (var p in Starts)
+                            {
+                                index++;
+                                if (index < Starts.Count - 1)
+                                {
+                                    len = Starts[index + 1] - Starts[index];
+                                }
+                                else
+                                    len = size - Starts[index];
+                                if (len > Longest)
+                                    Longest = len;
+                            }
+                            index = -1;
+                            string Header1 = "Pos       ";
+                            for (int i = 0; i < Longest; i++)
+                                Header1 += $"{(i / 100),-3:D2}";
+                            string Header2 = "          ";
+                            for (int i = 0; i < Longest; i++)
+                                Header2 += $"{(i % 100),-3:D2}";
+                            string Header3 = "----------";
+                            for (int i = 0; i < Longest; i++)
+                                Header3 += $"---";
+                            if (ExtractFiles)
+                            {
+                                AddText(TextFile, Header1 + "\n");
+                                AddText(TextFile, Header2 + "\n");
+                                AddText(TextFile, Header3 + "\n");
+                            }
                             foreach (var p in Starts)
                             {
                                 pos = p;
@@ -3364,13 +3411,13 @@ namespace ConvertToKicad
                                     name = "";
                                 pos = (uint)ms.Position;
                                 // find out how many bytes to read
-                                UInt32 len;
                                 if (index < Starts.Count - 1)
                                 {
                                     len = Starts[index + 1] - Starts[index];
                                 }
                                 else
                                     len = size - Starts[index];
+                                
                                 // we are now pointing to the pad record
                                 //
                                 Layers Layer;
@@ -3386,18 +3433,23 @@ namespace ConvertToKicad
                                 Int16 Net;
                                 Int16 JumperID;
                                 byte[] bytes = br.ReadBytes((int)len-6); // get record after header stuff
+                               
                                 if (p == 0)
                                     r = bytes; // get reference bytes
                                 string text = "";
                                 int count = 0;
                                 foreach(var c in bytes)
                                 {
-                                    if(r[count] != bytes[count])
+                                    if(count < l && r[count] != bytes[count])
                                         text += $"->{count}";
                                     text += $" {c:X2}";
                                     count++;
                                 }
-                                OutputString($"{pos:X8} " + text);
+                                if (ExtractFiles)
+                                    AddText(TextFile, $"{pos:X8} " + text + "\n");
+
+                                //OutputString($"{pos:X8} " + text);
+                                
                                 PadStruct pad = ByteArrayToStructure<PadStruct>(bytes);
 
                                 unsafe
@@ -3431,7 +3483,7 @@ namespace ConvertToKicad
                                 }
                                 bool InComponent = Component != -1;
 
-                                if (len == 744) // i.e. is this a rounded rectangle pad?
+                                if (len >= 744) // i.e. is this a rounded rectangle pad?
                                     shape = 5; // this seems a frig as the pad shape is set 1 when it should be 5
                                 string[] shapes = { "circle", "circle", "rect", "octagonal", "oval", "roundrect" };
                                 if (shapes[shape] == "circle" && XSize != YSize)
@@ -3489,6 +3541,7 @@ namespace ConvertToKicad
                         {
                             CheckThreadAbort(Ex);
                         }
+                        TextFile.Close();
                     }
                 }
                 catch (Exception Ex)
@@ -3609,7 +3662,7 @@ namespace ConvertToKicad
                     ComponentNumber = component;
                 }
                 // check for and reject very short tracks
-                if ((Math.Abs(X1 - X2) < 0.001) && (Math.Abs(Y1 - Y2) < 0.001))
+                if (Length(X1, Y1, X2, Y2) <= 0.001) //(Math.Abs(X1 - X2) < 0.001) && (Math.Abs(Y1 - Y2) < 0.001))
                 {
                     OutputError($"Zero length track rejected at X1={X1} Y1={Y1} X2={X2} y2={Y2} ");
                     return true;
@@ -4682,7 +4735,12 @@ $@"
         static void ProcessPcbObject(CompoundFile cf, PcbDocEntry Object)
         {
             OutputString("Processing " + Object.FileName);
-            CFStorage storage = cf.RootStorage.GetStorage(Object.FileName);
+            CFStorage storage = cf.RootStorage.TryGetStorage(Object.FileName);
+            if(storage==null)
+            {
+                OutputString($"Didn't find '{Object.FileName}'");
+                return;
+            }
             if (MakeDir(storage.Name))
             {
                 Directory.SetCurrentDirectory(@".\" + storage.Name);
@@ -4733,32 +4791,24 @@ $@"
                 }
 
                 CFStream stream;
-                try
+                if (ExtractFiles)
                 {
-                    if (ExtractFiles)
+                    try
                     {
                         CFStream datastream = storage.GetStream("Data");
                         // get file contents and write to file
                         byte[] temp = datastream.GetData();
-                        FileStream F = new FileStream("Data.dat", FileMode.OpenOrCreate, FileAccess.ReadWrite);
-                        F.SetLength(0); // prevent old data being reinterpreted i.e. when file is smaller than last time
-                        F.Close();
-                        using (System.IO.BinaryWriter file = new System.IO.BinaryWriter(File.OpenWrite("Data.dat")))
-                        {
-                            try
-                            {
-                                // Writer raw data                
-                                file.Write(temp);
-                                file.Flush();
-                                file.Close();
-                            }
-                            catch (Exception Ex)
-                            {
-                                CheckThreadAbort(Ex);
-                            }
-                        }
+                        File.WriteAllBytes("Data.dat", temp);
                     }
-                    /*CFStream*/ stream = storage.GetStream("Data");
+                    catch (Exception Ex)
+                    {
+                        CheckThreadAbort(Ex);
+                    }
+                }
+                /*CFStream*/
+                stream = storage.GetStream("Data");
+                try
+                {
                     // get file contents and process
                     byte[] data = stream.GetData();
                     if (Object.Binary_size != 0)
@@ -4881,9 +4931,16 @@ $@"
                         return;
                 }
 
-                if ((filename.Length - filename.IndexOf(".pcbdoc", StringComparison.OrdinalIgnoreCase)) != 7)
+                string Extension = "";
+                if ((filename.Length - filename.IndexOf(".pcbdoc", StringComparison.OrdinalIgnoreCase)) == 7)
+                    Extension = ".pcbdoc";
+                else
+                if ((filename.Length - filename.IndexOf(".cmpcbdoc", StringComparison.OrdinalIgnoreCase)) == 9)
+                    Extension = ".cmpcbdoc";
+
+                if(Extension == "")
                 {
-                    OutputError($"File {filename} should end in '.pcbdoc'");
+                    OutputError($"File {filename} should end in '.pcbdoc' or '.cmpcbdoc'");
                     System.Environment.Exit(0);
                 }
 
@@ -4895,7 +4952,8 @@ $@"
                     System.Environment.Exit(0);
                 }
 
-                if (filename.Substring(index, filename.Length - index).ToLower() != ".pcbdoc")
+                //if (filename.Substring(index, filename.Length - index).ToLower() != ".pcbdoc")
+                if(Extension == "")
                 {
                     OutputError($"File {filename} is not valid pcb file");
                     System.Environment.Exit(0);
@@ -4961,6 +5019,23 @@ $@"
                 Directory.SetCurrentDirectory(UnpackDirectory);
                 string cd = Directory.GetCurrentDirectory();
 
+                IList<IDirectoryEntry> entries = cf.GetDirectories();
+                //                foreach (OpenMcdf.CFItem item in cf.EnumChildren.Where(x => x.IsStorage))
+                //                {
+                //                }
+                ////   VisitedEntryAction va = delegate (CFItem item)
+                //   {
+                //       OutputString(item.Name);
+                //    };
+
+                //       cf.RootStorage.VisitEntries(va, true);
+
+                if (Extension == ".cmpcbdoc")
+                {
+                    // extract Circuit maker files and then try and rename directories
+                    // to match .pcbdoc entries
+                    CMConvert(cf);
+                }
                 if (MakeDir(cf.RootStorage.Name))
                 {
                     Directory.SetCurrentDirectory(".\\" + cf.RootStorage.Name);
@@ -4971,25 +5046,32 @@ $@"
                     }
                 }
                 // sort out the 3D models
-                Directory.SetCurrentDirectory("Models");
-                ProcessModelsFile("Data.dat");
-                if (!ExtractFiles)
-                    File.Delete("Data.dat");
-                Directory.SetCurrentDirectory(@"..\..");
-                try
+                if (Directory.Exists("Models"))
                 {
-                    if (Directory.Exists("Models"))
+                    Directory.SetCurrentDirectory("Models");
+                    ProcessModelsFile("Data.dat");
+                    if (!ExtractFiles)
+                    {
+                        File.Delete("Data.dat");
+                        if (File.Exists("Data.txt"))
+                            File.Delete("Data.txt");
+                    }
+                    Directory.SetCurrentDirectory(@"..\..");
+                    try
+                    {
+                        if (Directory.Exists("Models"))
+                            Directory.Delete("Models", true);
+                    }
+                    catch (Exception Ex)
+                    {
+                        CheckThreadAbort(Ex);
+                    }
+                    Directory.Move(@"Root Entry\Models", "Models");
+                    if (!Directory.EnumerateFileSystemEntries("Models").Any())
+                    {
+                        // Models directory is empty so get rid
                         Directory.Delete("Models", true);
-                }
-                catch (Exception Ex)
-                {
-                    CheckThreadAbort(Ex);
-                }
-                Directory.Move(@"Root Entry\Models", "Models");
-                if(!Directory.EnumerateFileSystemEntries("Models").Any())
-                {
-                    // Models directory is empty so get rid
-                    Directory.Delete("Models", true);
+                    }
                 }
                 if (!ExtractFiles)
                 {
