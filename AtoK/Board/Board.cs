@@ -11,11 +11,14 @@ namespace ConvertToKicad
         // class for track/arc objects which are part of the board outline
         class BoundaryObject : Object
         {
+            enum Types { Line = 0, Arc = 2};
+
             public double X1 { get; set; }
             public double Y1 { get; set; }
             public double X2 { get; set; }
             public double Y2 { get; set; }
             public double Angle { get; set; } // for arcs
+            private int Type;
 
             private BoundaryObject()
             {
@@ -23,6 +26,7 @@ namespace ConvertToKicad
                 Y1 = 0;
                 X2 = 0;
                 Y2 = 0;
+                Type = (int)Types.Line;
             }
 
             public BoundaryObject(double x1, double y1, double x2, double y2)
@@ -32,7 +36,7 @@ namespace ConvertToKicad
                 X2 = x2;
                 Y2 = y2;
                 Angle = 0;
-                Line line = new Line(x1, y1, x2, y2, Layers.Mech_1, 0.1);
+                Type = (int)Types.Line;
             }
 
             public BoundaryObject(double x1, double y1, double x2, double y2, double angle)
@@ -42,15 +46,32 @@ namespace ConvertToKicad
                 X2 = x2;
                 Y2 = y2;
                 Angle = angle;
-                Arc arc = new Arc(x1, y1, x2, y2, angle, "Edge.Cuts", 0.1);
+                Type = (int)Types.Arc;
             }
 
+            public override string ToString()
+            {
+                if (Type == (int)Types.Line)
+                    return $"  (gr_line (start {X1} {-Y1}) (end {X2} {-Y2}) (layer Edge.Cuts) (width 0.05))\n";
+                else
+                    return $"  (gr_arc (start {X1} {-Y1}) (end {X2} {-Y2}) (angle {Angle}) (layer Edge.Cuts) (width {0.05}))\n";
+                ;
+            }
         }
 
         // class for the board document in the pcbdoc file
         class Board : PcbDocEntry
         {
             public List<BoundaryObject> BoundaryObjects;
+
+            public string OutputBoardOutline()
+            {
+                string outline = "# Board Outline\n";
+                foreach (var Obj in BoundaryObjects)
+                    outline += Obj.ToString();
+                outline += "# End Board outline\n";
+                return outline;
+            }
 
             public class Layer
             {
@@ -103,7 +124,7 @@ namespace ConvertToKicad
             {
             }
 
-            public Board(string filename, string record, Type type, int off) : base(filename, record, type, off)
+            public Board(string filename, string cmfilename, string record, Type type, int off) : base(filename, cmfilename, record, type, off)
             {
                 LayersL = new List<Layer>();
                 OrderedLayers = new List<Layer>();
@@ -114,10 +135,9 @@ namespace ConvertToKicad
             {
                 if (Length(x1, y1, x2, y2) <= 0.001)
                 {
-                    OutputError($"Rejected zero length line in boundary at {x1} {y1}");
+                    OutputError($"Rejected zero length line in boundary at {x1} {y1} {x2} {y2}");
                     return;
                 }
-                board_outline += $"  (gr_line (start {x1} {-y1}) (end {x2} {-y2}) (layer Edge.Cuts) (width 0.05))\n";
                 BoundaryObject Line = new BoundaryObject(x1, y1, x2, y2);
                 BoundaryObjects.Add(Line);
             }
@@ -132,14 +152,19 @@ namespace ConvertToKicad
                 return false;
             }
 
-            public void BoardAddArc(double x1, double y1, double x2, double y2, double angle)
+            private double ArcLength(double X1, double Y1, double X2, double Y2, double Angle)
             {
-                if (x1 == x2 && y1 == y2)
+                return 2 * Math.PI * Length(X1,Y1,X2,Y2) * (Math.Abs(Angle) / 360);
+            }
+
+            public void BoardAddArc(double X1, double Y1, double X2, double Y2, double Angle)
+            {
+                if (ArcLength(X1, Y1, X2, Y2, Angle)<=0.001)
                 {
-                    OutputError("Rejected zero length arc in boundary");
+                    OutputError($"Rejected zero length arc in boundary {X1} {Y1} {X2} {Y2} {Angle}");
                     return;
                 }
-                BoundaryObject Arc = new BoundaryObject(x1, y1, x2, y2, angle);
+                BoundaryObject Arc = new BoundaryObject(X1, Y1, X2, Y2, Angle);
                 BoundaryObjects.Add(Arc);
             }
 
@@ -223,7 +248,6 @@ namespace ConvertToKicad
                             count++;
                             if (Kind == "0")
                             {
-                                //board_outline += $"  (gr_line (start {x} {-y}) (end {nx} {-ny}) (layer Edge.Cuts) (width 0.05))\n";
                                 BoardAddLine(x, y, nx, ny);
                             }
                             else
@@ -238,7 +262,6 @@ namespace ConvertToKicad
                                 double Angle = Math.Round(-(ea - sa), Precision);
                                 double X = Math.Round(cx + r * Math.Cos(sa * Math.PI / 180), Precision);
                                 double Y = Math.Round(cy + r * Math.Sin(sa * Math.PI / 180), Precision);
-                                board_outline += $"  (gr_arc (start {X1} {-Y1}) (end {X} {-Y}) (angle {Angle}) (layer Edge.Cuts) (width {0.05}))\n";
                                 BoardAddArc(X1, Y1, X, Y, Angle);
                             }
                         }
@@ -323,6 +346,8 @@ namespace ConvertToKicad
                 {
                     string Type = "";
                     Type = (Layer.AltiumName.Substring(0, Precision) == "Int") ? "power" : "signal";
+                    if (Layer.PcbNewLayer == "B.Cu")
+                        i = 31;
                     Layers += $"    ({i++} {Layer.PcbNewLayer} {Type})\n";
                 }
                 return Layers;
@@ -347,24 +372,24 @@ namespace ConvertToKicad
                     /*
                     case Layers.top_layer: return "F.Cu";*/
                     case Layers.Multi_Layer: return "*.Cu"; // *.Mask";
-                                                            /*                    case Layers.bottom_layer: return "B.Cu";
-                                                                                case Layers.plane_1: return "In1.Cu";
-                                                                                case Layers.plane_2: return "In2.Cu";
-                                                                                case Layers.plane_3: return "In3.Cu";
-                                                                                case Layers.plane_4: return "In4.Cu";
-                                                                                case Layers.plane_5: return "In5.Cu";
-                                                                                case Layers.plane_6: return "In6.Cu";
-                                                                                case Layers.plane_7: return "In7.Cu";
-                                                                                case Layers.plane_8: return "In8.Cu";
-                                                                                case Layers.plane_9: return "In9.Cu";
-                                                                                case Layers.plane_10: return "In10.Cu";
-                                                                                case Layers.plane_11: return "In11.Cu";
-                                                                                case Layers.plane_12: return "In12.Cu";
-                                                                                case Layers.plane_13: return "In13.Cu";
-                                                                                case Layers.plane_14: return "In14.Cu";
-                                                                                case Layers.plane_15: return "In15.Cu";
-                                                                                case Layers.plane_16: return "In16.Cu";
-                                                                                                                        */
+/*                    case Layers.bottom_layer: return "B.Cu";
+                    case Layers.plane_1: return "In1.Cu";
+                    case Layers.plane_2: return "In2.Cu";
+                    case Layers.plane_3: return "In3.Cu";
+                    case Layers.plane_4: return "In4.Cu";
+                    case Layers.plane_5: return "In5.Cu";
+                    case Layers.plane_6: return "In6.Cu";
+                    case Layers.plane_7: return "In7.Cu";
+                    case Layers.plane_8: return "In8.Cu";
+                    case Layers.plane_9: return "In9.Cu";
+                    case Layers.plane_10: return "In10.Cu";
+                    case Layers.plane_11: return "In11.Cu";
+                    case Layers.plane_12: return "In12.Cu";
+                    case Layers.plane_13: return "In13.Cu";
+                    case Layers.plane_14: return "In14.Cu";
+                    case Layers.plane_15: return "In15.Cu";
+                    case Layers.plane_16: return "In16.Cu";
+                                                            */
                     case Layers.Top_Overlay: return "F.SilkS";
                     case Layers.Bottom_Overlay: return "B.SilkS";
                     case Layers.Keepout_Layer: return "Margin";

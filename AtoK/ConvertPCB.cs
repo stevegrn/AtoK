@@ -19,14 +19,15 @@ namespace ConvertToKicad
         public const int Precision = 3; // after the decimal point precision i.e. 3 digits
         static string net_classes = "";
         static string tracks = "";
+        static UInt32 track_count = 0;
         static string texts = "";
         static string arcs = "";
         static string fills = "";
         static string keepouts = "";
-        static string board_outline = "";
         public static bool ExtractFiles = false;
         public static bool CreateLib = false;
         public static bool Verbose = false;
+        public static bool CMFile = false;
         static string CurrentLayer = "";
         static int CurrentModule;
         public static string filename = "";
@@ -145,43 +146,8 @@ namespace ConvertToKicad
         // return the length of a track
         static double Length(double x1, double y1, double x2, double y2)
         {
-            return Math.Sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
-        }
-
-        static string ToLiteral(string input)
-        {
-            StringBuilder literal = new StringBuilder(input.Length + 2);
-            foreach (var c in input)
-            {
-                switch (c)
-                {
-                    case '\'': literal.Append(@"\'"); break;
-                    case '\"': literal.Append("\\\""); break;
-                    //    case '\\': literal.Append(@"\\"); break;
-                    case '\0': literal.Append(@"\0"); break;
-                    case '\a': literal.Append(@"\a"); break;
-                    case '\b': literal.Append(@"\b"); break;
-                    case '\f': literal.Append(@"\f"); break;
-                    case '\n': literal.Append(@"\n"); break;
-                    case '\r': literal.Append(@"\r"); break;
-                    case '\t': literal.Append(@"\t"); break;
-                    case '\v': literal.Append(@"\v"); break;
-                    default:
-                        // ASCII printable character
-                        if (c >= 0x20 && c <= 0x7e)
-                        {
-                            literal.Append(c);
-                            // As UTF16 escaped character
-                        }
-                        else
-                        {
-                            literal.Append(@"\u");
-                            literal.Append(((int)c).ToString("x4"));
-                        }
-                        break;
-                }
-            }
-            return literal.ToString();
+            double length = Math.Sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+            return length;
         }
 
         // find the string 's' within the string 'line' and return the remaining string up to the next '|'
@@ -201,7 +167,7 @@ namespace ConvertToKicad
                 length = end - start;
 
             string param = line.Substring(start, length);
-            return ToLiteral(param.TrimEnd('\0'));
+            return ToLiteral(param.TrimEnd('\0')); //return param.TrimEnd('\0'); 
         }
 
         // get unsigned 32 bit number
@@ -452,11 +418,13 @@ namespace ConvertToKicad
                 Y = Math.Round(y, Precision);
             }
 
+            // rotate point around 0,0
             public void Rotate(double rotation)
             {
                 rotation %= 360;
                 if (rotation != 0)
                 {
+                    // convert to radians
                     rotation = rotation * Math.PI / 180;
                     double xp = X;
                     double yp = Y;
@@ -484,7 +452,7 @@ namespace ConvertToKicad
         // class for point objects
         class Point : Object
         {
-            private readonly double X, Y;
+            public readonly double X, Y;
 
             private Point()
             { }
@@ -573,6 +541,7 @@ namespace ConvertToKicad
         class PcbDocEntry
         {
             public string FileName { get; set; }
+            public string CMFileName { get; set; }
             public string Record { get; set; }
             public Type Type { get; set; }
             private readonly int offset;
@@ -586,10 +555,11 @@ namespace ConvertToKicad
                 Processed = 0;
             }
 
-            public PcbDocEntry(string filename, string record, Type type, int off)
+            public PcbDocEntry(string filename, string cmfilename, string record, Type type, int off)
             {
                 binary = new List<byte[]>();
                 FileName = filename;
+                CMFileName = cmfilename;
                 Record = record;
                 Type = type;
                 offset = off;
@@ -770,7 +740,7 @@ namespace ConvertToKicad
                 DirectoryInfo info = Directory.CreateDirectory(name);
                 if (!info.Exists)
                 {
-                    Console.WriteLine($@"failed to create directory ""{name}""");
+                    OutputError($@"failed to create directory ""{name}""");
                     return false;
                 }
             }
@@ -780,17 +750,29 @@ namespace ConvertToKicad
         static void ProcessPcbObject(CompoundFile cf, PcbDocEntry Object)
         {
             OutputString("Processing " + Object.FileName);
-            CFStorage storage = cf.RootStorage.TryGetStorage(Object.FileName);
-            if(storage==null)
+            CFStorage storage=null;
+            CMFile = false;
+            if (!CMFile)
             {
-                OutputString($"Didn't find '{Object.FileName}'");
-                return;
+                storage = cf.RootStorage.TryGetStorage(Object.FileName);
+                if (storage == null)
+                {
+                    // couldn't find normal filename try to see if CM file exists
+                    storage = cf.RootStorage.TryGetStorage(Object.CMFileName);
+                    if (storage == null)
+                    {
+                        OutputString($"Didn't find '{Object.FileName}'");
+                        return;
+                    }
+                }
             }
-            if (MakeDir(storage.Name))
+            if (MakeDir(Object.FileName)) // storage.Name))
             {
-                Directory.SetCurrentDirectory(@".\" + storage.Name);
+                Directory.SetCurrentDirectory(@".\" + Object.FileName); // storage.Name);
 
-                if (storage.Name == "Models")
+                string dir = Directory.GetCurrentDirectory();
+
+                if (Object.FileName == "Models" && !CMFile)
                 {
                     // extract the model files to 0.dat,1.dat...
                     // this is called for each of the directory entries
@@ -799,34 +781,28 @@ namespace ConvertToKicad
                         // write all entries (0,1,2..n,Data) to files (0.dat,1.dat...)
                         if (it.Name != "Header")
                         {
-                            using (System.IO.BinaryWriter file = new System.IO.BinaryWriter(File.OpenWrite(it.Name + ".dat")))
+                            // get file contents and write to file
+                            CFStream fstream = it as CFStream;
+
+                            byte[] temp = fstream.GetData();
+                            try
                             {
-                                // get file contents and write to file
-                                CFStream fstream = it as CFStream;
+                                File.WriteAllBytes($"{it.Name}.dat", temp);
+                            }
+                            catch (Exception Ex)
+                            {
+                                CheckThreadAbort(Ex);
+                            }
+                            string filename = $"{it.Name}.dat";
+                            if (filename != "Data.dat")
+                            {
+                                // uncompress the x.dat file to a .step file
+                                // step file is renamed to its actual name later in the process
+                                byte[] compressed = File.ReadAllBytes(filename);
+                                string Inflated = ZlibCodecDecompress(compressed);
 
-                                byte[] temp = fstream.GetData();
-                                try
-                                {
-                                    // Writer raw data                
-                                    file.Write(temp);
-                                    file.Flush();
-                                    file.Close();
-                                }
-                                catch (Exception Ex)
-                                {
-                                    CheckThreadAbort(Ex);
-                                }
-                                string filename = it.Name + ".dat";
-                                if (filename != "Data.dat")
-                                {
-                                    // uncompress the x.dat file to a .step file
-                                    // step file is renamed to it's actual name later in the process
-                                    byte[] compressed = File.ReadAllBytes(filename);
-                                    string Inflated = ZlibCodecDecompress(compressed);
-
-                                    File.WriteAllText(it.Name + ".step", Inflated);
-                                    File.Delete(filename); // no longer need .dat file
-                                }
+                                File.WriteAllText(it.Name + ".step", Inflated);
+                                File.Delete(filename); // no longer need .dat file
                             }
                         }
                     }
@@ -835,15 +811,13 @@ namespace ConvertToKicad
                     storage.VisitEntries(vs, true);
                 }
 
-                CFStream stream;
-                if (ExtractFiles)
+                if (ExtractFiles && !CMFile)
                 {
                     try
                     {
-                        CFStream datastream = storage.GetStream("Data");
                         // get file contents and write to file
-                        byte[] temp = datastream.GetData();
-                        File.WriteAllBytes("Data.dat", temp);
+                        //byte[] temp = ;
+                        File.WriteAllBytes("Data.dat", storage.GetStream("Data").GetData());
                     }
                     catch (Exception Ex)
                     {
@@ -851,11 +825,22 @@ namespace ConvertToKicad
                     }
                 }
                 /*CFStream*/
-                stream = storage.GetStream("Data");
                 try
                 {
-                    // get file contents and process
-                    byte[] data = stream.GetData();
+                    byte[] data;
+                    if (!CMFile)
+                    {
+                        //CFStream stream;
+                        //stream = storage.GetStream("Data");
+                        // get file contents and process
+                        data = storage.GetStream("Data").GetData();
+                    }
+                    else
+                    {
+                        string dir2 = Directory.GetCurrentDirectory();
+                        // get the data from the extracted file
+                        data = File.ReadAllBytes("Data.dat");
+                    }
                     if (Object.Binary_size != 0)
                         Object.ProcessBinaryFile(data);
                     else
@@ -863,6 +848,8 @@ namespace ConvertToKicad
                 }
                 catch (Exception Ex)
                 {
+                    string where = Directory.GetCurrentDirectory();
+
                     CheckThreadAbort(Ex);
                 }
 
@@ -938,7 +925,6 @@ namespace ConvertToKicad
             arcs = "";
             fills = "";
             keepouts = "";
-            board_outline = "";
 
             try
             {
@@ -978,10 +964,16 @@ namespace ConvertToKicad
 
                 string Extension = "";
                 if ((filename.Length - filename.IndexOf(".pcbdoc", StringComparison.OrdinalIgnoreCase)) == 7)
+                {
                     Extension = ".pcbdoc";
+                    CMFile = false;
+                }
                 else
                 if ((filename.Length - filename.IndexOf(".cmpcbdoc", StringComparison.OrdinalIgnoreCase)) == 9)
+                {
                     Extension = ".cmpcbdoc";
+                    CMFile = true;
+                }
 
                 if(Extension == "")
                 {
@@ -1004,48 +996,49 @@ namespace ConvertToKicad
                     System.Environment.Exit(0);
                 }
 
-                FV = new FileVersionInfo("FileVersionInfo", "", Type.text, 4);
+                FV = new FileVersionInfo("FileVersionInfo", "38434311D9D84DCDB403436D1149A8", "", Type.text, 4);
 
                 // Initialise the PcbObjects list
                 PcbObjects = new List<PcbDocEntry>
                 {
                     FV,
-                    new Board                    ("Board6",                       "Board",                    Type.text,   4),
-                    new Rules                    ("Rules6",                       "Rule",                     Type.text,   6),
-                    new AdvancedPlacerOptions    ("Advanced Placer Options6",     "AdvancedPlacerOptions",    Type.text,   4), // not used
-                    new DesignRuleCheckerOptions ("Design Rule Checker Options6", "DesignRuleCheckerOptions", Type.text,   4), // not used
-                    new PinSwapOptions           ("Pin Swap Options6",            "PinSwapOptions",           Type.text,   4), // not used
-                    new Classes                  ("Classes6",                     "Class",                    Type.text,   4),
-                    new Nets                     ("Nets6",                        "Net",                      Type.text,   4),
-                    new Components               ("Components6",                  "Component",                Type.text,   4),
-                    new Polygons                 ("Polygons6",                    "Polygon",                  Type.text,   4),
-                    new Dimensions               ("Dimensions6",                  "Embedded",                 Type.text,   6),
-                    new Arcs                     ("Arcs6",                        "Arc",                      Type.binary, 4),
-                    new Pads                     ("Pads6",                        "Pad",                      Type.binary, 4),
-                    new Vias                     ("Vias6",                        "Via",                      Type.binary, 4),
-                    new Tracks                   ("Tracks6",                      "Track",                    Type.binary, 4),
-                    new Texts                    ("Texts6",                       "Text",                     Type.binary, 4),
-                    new Fills                    ("Fills6",                       "Fill",                     Type.binary, 4),
-                    new DifferentialPairs        ("DifferentialPairs6",           "DifferentialPair",         Type.text,   4),
-                    new Regions                  ("Regions6",                     "Region",                   Type.binary, 4),
-                    new Models6                  ("Models",                       "ComponentBody",            Type.text,   4),
-                    new ComponentBodies          ("ComponentBodies6",             "ComponentBody",            Type.binary, 4),
-                    new ShapeBasedComponentBodies("ShapeBasedComponentBodies6",   "ComponentBody",            Type.binary, 4)
+                    new Board                    ("Board6",                       "96B09F5C6CEE434FBCE0DEB3E88E70", "Board",                    Type.text,   4),
+                    new Rules                    ("Rules6",                       "C27718A40C94421388FAE5BD7785D7", "Rule",                     Type.text,   6),
+                    new Classes                  ("Classes6",                     "4F71DD45B09143988210841EA1C28D", "Class",                    Type.text,   4),
+                    new Nets                     ("Nets6",                        "35D7CF51BB9B4875B3A138B32D80DC", "Net",                      Type.text,   4),
+                    new Components               ("Components6",                  "F9D060ACC7DD4A85BC73CB785BAC81", "Component",                Type.text,   4),
+                    new Polygons                 ("Polygons6",                    "A1931C8B0B084A61AA45146575FDD3", "Polygon",                  Type.text,   4),
+                    new Dimensions               ("Dimensions6",                  "068B9422DBB241258BA2DE9A6BA1A6", "Embedded",                 Type.text,   6),
+                    new Arcs                     ("Arcs6",                        "1CEEB63FB33847F8AFC4485F64735E", "Arc",                      Type.binary, 4),
+                    new Pads                     ("Pads6",                        "4F501041A9BC4A06BDBDAB67D3820E", "Pad",                      Type.binary, 4),
+                    new Vias                     ("Vias6",                        "C87A685A0EFA4A90BEEFD666198B56", "Via",                      Type.binary, 4),
+                    new Tracks                   ("Tracks6",                      "412A754DBB864645BF01CD6A80C358", "Track",                    Type.binary, 4),
+                    new Texts                    ("Texts6",                       "A34BC67C2A5F408D8F377378C5C5E2", "Text",                     Type.binary, 4),
+                    new Fills                    ("Fills6",                       "6FFE038462A940E9B422EFC8F5D85E", "Fill",                     Type.binary, 4),
+                    new DifferentialPairs        ("DifferentialPairs6",           "17DC1EE78CF64F22A78C16A208DE80", "DifferentialPair",         Type.text,   4),
+                    new Regions                  ("Regions6",                     "F513A5885418472886D3EF18A09E46", "Region",                   Type.binary, 4),
+                    new Models6                  ("Models",                       "0DB009C021D946C88F1B3A32DAE94B", "ComponentBody",            Type.text,   4),
+                    new ComponentBodies          ("ComponentBodies6",             "A0DB41FBCB0D49CE8C32A271AA7EF5", "ComponentBody",            Type.binary, 4),
+                    new ShapeBasedComponentBodies("ShapeBasedComponentBodies6",   "44D9487C98CE4F0EB46AB6E9CDAF40", "ComponentBody",            Type.binary, 4)
                 /* Not interested in the rest of these
                     , 
-                    new EmbeddedFonts            ("EmbeddedFonts6",               "",                         Type.binary, 4),
-                    new ShapeBasedRegions        ("ShapeBasedRegions6",           "",                         Type.mixed,  4),
-                    new Connections              ("Connections6",                 "",                         Type.binary, 4),
-                    new Coordinates              ("Coordinates6",                 "",                         Type.binary, 4),
-                    new Embeddeds                ("Embeddeds6",                   "",                         Type.binary, 4),
-                    new EmbeddedBoards           ("EmbeddedBoards6",              "",                         Type.binary, 4),
-                    new FromTos                  ("FromTos6",                     "",                         Type.binary, 4),
-                    new ModelsNoEmbeds           ("ModelsNoEmbed",                "",                         Type.binary, 4),
-                    new Textures                 ("Textures",                     "",                         Type.binary, 4)
+                    new AdvancedPlacerOptions    ("Advanced Placer Options6",     "90F01116977A40EF9F7CD92931AB45", "AdvancedPlacerOptions",    Type.text,   4), // not used
+                    new PinSwapOptions           ("Pin Swap Options6",            "", "PinSwapOptions",           Type.text,   4), // not used
+                    new DesignRuleCheckerOptions ("Design Rule Checker Options6", "0A342FA35A2D4FCDB8D2187D411EBC", "DesignRuleCheckerOptions", Type.text,   4), // not used
+                    new EmbeddedFonts            ("EmbeddedFonts6",               "", "",                         Type.binary, 4),
+                    new ShapeBasedRegions        ("ShapeBasedRegions6",           "", "",                         Type.mixed,  4),
+                    new Connections              ("Connections6",                 "", "",                         Type.binary, 4),
+                    new Coordinates              ("Coordinates6",                 "", "",                         Type.binary, 4),
+                    new Embeddeds                ("Embeddeds6",                   "", "",                         Type.binary, 4),
+                    new EmbeddedBoards           ("EmbeddedBoards6",              "", "",                         Type.binary, 4),
+                    new FromTos                  ("FromTos6",                     "", "",                         Type.binary, 4),
+                    new ModelsNoEmbeds           ("ModelsNoEmbed",                "", "",                         Type.binary, 4),
+                    new Textures                 ("Textures",                     "", "",                         Type.binary, 4)
                 */
                 };
 
-                Brd = (Board)PcbObjects[1]; // has layer stack set up in it now
+                // Boards6 is processed first so will have layer stack set up in it
+                Brd = (Board)PcbObjects[1];
 
                 CompoundFile cf = new CompoundFile(filename);
                 OutputString($"Converting {filename}");
@@ -1065,22 +1058,6 @@ namespace ConvertToKicad
                 string cd = Directory.GetCurrentDirectory();
 
                 IList<IDirectoryEntry> entries = cf.GetDirectories();
-                //                foreach (OpenMcdf.CFItem item in cf.EnumChildren.Where(x => x.IsStorage))
-                //                {
-                //                }
-                ////   VisitedEntryAction va = delegate (CFItem item)
-                //   {
-                //       OutputString(item.Name);
-                //    };
-
-                //       cf.RootStorage.VisitEntries(va, true);
-
-                if (Extension == ".cmpcbdoc")
-                {
-                    // extract Circuit maker files and then try and rename directories
-                    // to match .pcbdoc entries
-                    CMConvert(cf);
-                }
                 if (MakeDir(cf.RootStorage.Name))
                 {
                     Directory.SetCurrentDirectory(".\\" + cf.RootStorage.Name);
@@ -1090,6 +1067,7 @@ namespace ConvertToKicad
                         ProcessPcbObject(cf, Object);
                     }
                 }
+                cf.Close();
                 // sort out the 3D models
                 if (Directory.Exists("Models"))
                 {
@@ -1149,7 +1127,7 @@ namespace ConvertToKicad
                     OutFile.WriteLine("    (area 0 0 0 0)");
                     OutFile.WriteLine("    (thickness 1.6)");
                     OutFile.WriteLine("    (drawings 0)");
-                    OutFile.WriteLine($"    (tracks {LinesL.Count})");
+                    OutFile.WriteLine($"    (tracks {track_count})");
                     OutFile.WriteLine($"    (zones {PolygonsL.Count})");
                     OutFile.WriteLine($"    (modules {ModulesL.Count})");
                     OutFile.WriteLine($"    (nets {NetsL.Count})");
@@ -1206,9 +1184,9 @@ namespace ConvertToKicad
                     OutFile.WriteLine("    (pad_drill 0.6)");
                     OutFile.WriteLine("    (pad_to_mask_clearance 0.1)"); // TODO should get value from design rules
                     OutFile.WriteLine("    (aux_axis_origin 0 0)");
-                    OutFile.WriteLine("    (visible_elements 7FFFF77F)");
+                    OutFile.WriteLine("    (visible_elements 7FFFF77F)"); // TODO find out what this should be
                     OutFile.WriteLine("    (pcbplotparams");
-                    OutFile.WriteLine("      (layerselection 262143)");
+                    OutFile.WriteLine("      (layerselection 262143)"); // TODO and this
                     OutFile.WriteLine("      (usegerberextensions false)");
                     OutFile.WriteLine("      (excludeedgelayer true)");
                     OutFile.WriteLine("      (linewidth 0.100000)");
@@ -1238,7 +1216,7 @@ namespace ConvertToKicad
 
                 OutFile.WriteLine(NetsL.ToString());
                 OutFile.WriteLine(net_classes);
-                OutFile.WriteLine(board_outline);
+                OutFile.WriteLine(Brd.OutputBoardOutline());
                 OutFile.WriteLine(ModulesL.ToString());
                 //            PadsL.ToString(); N.B. KiCad doesn't allow free standing pads yet ...TODO create modules to do this
                 OutFile.WriteLine(PolygonsL.ToString());

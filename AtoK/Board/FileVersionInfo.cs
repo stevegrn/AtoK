@@ -104,7 +104,7 @@ namespace ConvertToKicad
                 new VersionParam("Release 17.1", 849)
             };
 
-            public FileVersionInfo(string filename, string record, Type type, int off) : base(filename, record, type, off)
+            public FileVersionInfo(string filename, string cmfilename, string record, Type type, int off) : base(filename, cmfilename, record, type, off)
             {
                 Count = 0;
                 Versions = new List<Version>();
@@ -171,7 +171,7 @@ namespace ConvertToKicad
                         break;
                     }
                 }
-                OutputString($"Board saved by \"Altium {Versions[Versions.Count - 1].VER}\"");
+                OutputString($"Board last saved by \"Altium {Versions[Versions.Count - 1].VER}\"");
             }
 
             public int GetPadLength()

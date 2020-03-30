@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace ConvertToKicad
 {
@@ -27,8 +28,11 @@ namespace ConvertToKicad
                 OutputError($"renaming '{orig}' failed as '{newdir}' already exists");
                 long before = new System.IO.FileInfo($"{newdir}\\data.dat").Length;
                 AppendData($"{newdir}\\data.dat", data);
+                ClearFolder(orig);
+                Directory.Delete(orig);
+                OutputString($"Deleted {orig}");
                 long after = new System.IO.FileInfo($"{newdir}\\data.dat").Length;
-                OutputString($"Appended {after - before} bytes");
+                OutputString($"Appended {after - before} bytes to {newdir}\\data.dat");
             }
             else
             {
@@ -117,6 +121,22 @@ namespace ConvertToKicad
             return found;
         }
 
+        private bool IsShapeBasedComponentBodies6(byte[] data)
+        {
+            string str = Encoding.Default.GetString(data);
+            return str.Contains("MODEL.CHECKSUM=");
+
+            TypeBinary typebinary = ByteArrayToStructure<TypeBinary>(data);
+            if (typebinary.Type != 0x0C)
+                return false;
+            if (typebinary.Next+5 > data.Length)
+                return false;
+            if (typebinary.Next + 5 == data.Length)
+                return true;
+            if (data[typebinary.Next + 5] != 0x0C)
+                return false;
+            return true;
+        }
 
         private bool IsVias(byte[] data)
         {
@@ -145,7 +165,92 @@ namespace ConvertToKicad
         private bool IsComponentBodies(byte[] data)
         {
             string str = Encoding.Default.GetString(data);
-            return str.Contains("MODEL.CHECKSUM=");
+            return str.Contains("STANDOFFHEIGHT=");
+        }
+
+        private bool IsModels6(byte[] data)
+        {
+            string str = Encoding.Default.GetString(data);
+            return str.Contains("EMBED=");
+        }
+
+        private bool IsBoard6(byte[] data)
+        {
+            string str = Encoding.Default.GetString(data);
+            return str.Contains("ORIGINX=");
+        }
+
+        private bool IsPolygons6(byte[] data)
+        {
+            string str = Encoding.Default.GetString(data);
+            return str.Contains("REMOVEISLANSDBYAREA=");
+        }
+
+        private bool IsArcs6(byte[] data)
+        {
+            TypeBinary typebinary = ByteArrayToStructure<TypeBinary>(data);
+            if (typebinary.Type != 1)
+                return false;
+            if (typebinary.Next > data.Length)
+                return false;
+            if (data[typebinary.Next + 5] != 1)
+                return false;
+            return true;
+        }
+
+        private bool IsTexts6(byte[] data)
+        {
+            // check to see if header is the Texts file
+            using (MemoryStream ms = new MemoryStream(data))
+            {
+                UInt32 pos = 0;
+                uint size = (uint)ms.Length;
+
+                BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
+                ms.Seek(pos, SeekOrigin.Begin);
+                List<UInt32> Starts = new List<UInt32>();
+                // signature is
+                // byte 05
+                // int32 length
+                // then at position length+5 is UInt32 length of string
+                // then at position length + strlen is byte 5
+                ms.Seek(pos, SeekOrigin.Begin);
+                byte recordtype = br.ReadByte(); // should be 5
+                if (recordtype != 5)
+                    return false;
+                else
+                {
+                    // possible start
+                    UInt32 textaddr = br.ReadUInt32()+5;
+                    if (textaddr>=data.Length)
+                        return false;
+                    else
+                    {
+                        ms.Seek(textaddr, SeekOrigin.Begin);
+                        UInt32 textlength = br.ReadUInt32();
+                        if(textaddr+textlength < data.Length)
+                        {
+                            ms.Seek(textaddr+textlength+4, SeekOrigin.Begin);
+                            byte nexttype = br.ReadByte();
+                            if (nexttype == 5)
+                                return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        private bool IsDimensions6(byte[] data)
+        {
+            string str = Encoding.Default.GetString(data);
+            return str.Contains("DIMENSIONLAYER=");
+        }
+
+        private bool IsRules6(byte[] data)
+        {
+            string str = Encoding.Default.GetString(data);
+            return str.Contains("RULEKIND=");
         }
 
         void CMConvert(CompoundFile cf)
@@ -159,10 +264,11 @@ namespace ConvertToKicad
             {
                 if (entry.Name == "Root Entry")
                 {
-                    if (!Directory.Exists(entry.Name))
-                    {
-                        Directory.CreateDirectory(entry.Name);
-                    }
+                    DirectoryInfo Info = Directory.CreateDirectory(entry.Name);
+                    if(!Info.Exists)
+                        // for some reason the create directory failed so try again
+                        Info = Directory.CreateDirectory(entry.Name);
+                    Thread.Sleep(500); // TODO this is a frig sort out
                     ClearFolder(entry.Name);
                     Directory.SetCurrentDirectory(entry.Name);
                     CurrentDir = entry.Name;
@@ -198,20 +304,56 @@ namespace ConvertToKicad
                                 RenameDirectory(CurrentDir, "Vias6", data);
                             else
                             if (IsTracks(data))
-                                RenameDirectory(CurrentDir, "Track6", data);
+                                RenameDirectory(CurrentDir, "Tracks6", data);
                             else
                             if (IsComponentBodies(data))
                                 RenameDirectory(CurrentDir, "ComponentBodies6", data);
+                            else
+                            if (IsBoard6(data))
+                                RenameDirectory(CurrentDir, "Board6", data);
+                            else
+                            if (IsPolygons6(data))
+                                RenameDirectory(CurrentDir, "Polygons6", data);
+                            else
+                            if (IsShapeBasedComponentBodies6(data))
+                                RenameDirectory(CurrentDir, "ShapeBasedComponentBodies6", data);
+                            else
+                            if (IsArcs6(data))
+                                RenameDirectory(CurrentDir, "Arcs6", data);
+                            else
+                            if (IsTexts6(data))
+                                RenameDirectory(CurrentDir, "Texts6", data);
+                            else
+                            if (IsDimensions6(data))
+                                RenameDirectory(CurrentDir, "Dimensions6", data);
+                            else
+                            if (IsRules6(data))
+                                RenameDirectory(CurrentDir, "Rules6", data);
+                            else
+                            if (IsModels6(data))
+                            {
+                                RenameDirectory(CurrentDir, "Models", data);
+                                // now need to get all of the model files
+                                CFStream models;
+                                byte[] modeldata;
+                                int i = 0;
+                                while ((models = storage.TryGetStream($"{i}")) != null)
+                                {
+                                    OutputString($"Creating {i}.dat model file");
+                                    // get file contents and write to file
+                                    modeldata = models.GetData();
+                                    // uncompress the x.dat file to a .step file
+                                    // step file is renamed to it's actual name later in the process
+                                    string Inflated = ZlibCodecDecompress(modeldata);
+                                    File.WriteAllText($"Models\\{i}.step", Inflated);
+                                    i++;
+                                }
+                            }
                             else
                             if ((textfile2.type == 0x0001 && textfile2.Length < data.Length) || textfile.Length < data.Length)
                             {
                                 // could be text file
                                 string str = Encoding.Default.GetString(data);
-                                if (str.Contains("DIMENSIONLAYER"))
-                                {
-                                    RenameDirectory(CurrentDir, "Dimensions6", data);
-                                }
-                                else
                                 if (str.Contains("ORIGINX"))
                                 {
                                     RenameDirectory(CurrentDir, "Board6", data);
@@ -229,7 +371,7 @@ namespace ConvertToKicad
                                 else
                                 if (str.Contains("SOURCEFOOTPRINTLIBRARY"))
                                 {
-                                    RenameDirectory(CurrentDir, "Component6", data);
+                                    RenameDirectory(CurrentDir, "Components6", data);
                                 }
                                 else
                                 if (str.Contains("DesignRuleCheckerOptions"))
@@ -270,33 +412,20 @@ namespace ConvertToKicad
                                 {
                                     RenameDirectory(CurrentDir, "Vias6", data);
                                 }
+                                else
                                 if (typebinary.Type == 0x04)
                                 {
-                                    RenameDirectory(CurrentDir, "Track6", data);
+                                    RenameDirectory(CurrentDir, "Tracks6", data);
                                 }
-                                if (typebinary.Type == 0x05)
-                                {
-                                    RenameDirectory(CurrentDir, "Texts6", data);
-                                }
-                                if (typebinary.Type == 0x0C)
-                                {
-                                    RenameDirectory(CurrentDir, "Polygons6", data);
-                                }
-                                if (typebinary.Type == 0x0C)
-                                {
-                                    RenameDirectory(CurrentDir, "ShapeBasedComponentBodies6", data);
-                                }
+                                else
                                 if (typebinary.Type == 0x0B)
                                 {
                                     RenameDirectory(CurrentDir, "Regions6", data);
                                 }
+                                else
                                 if (typebinary.Type == 0x06)
                                 {
                                     RenameDirectory(CurrentDir, "Fills6", data);
-                                }
-                                if (typebinary.Type == 0x01)
-                                {
-                                    RenameDirectory(CurrentDir, "Arc6", data);
                                 }
                                 else
                                     OutputError($"Failed to convert possible binary file '{CurrentDir}'");

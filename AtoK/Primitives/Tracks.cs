@@ -66,9 +66,12 @@ namespace ConvertToKicad
         class Tracks : PcbDocEntry
         {
             // record length varies
-            public Tracks(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Tracks(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
-                Binary_size = 46;
+                if (CMFile)
+                    Binary_size = 50;
+                else
+                    Binary_size = 46;
             }
 
             public override bool ProcessLine(byte[] line)
@@ -113,12 +116,16 @@ namespace ConvertToKicad
                         if (!Brd.OnInnerLayer(layer))
                         {
                             if ((Layer != "Edge.Cuts") || !Brd.CheckExistingLine(X1, -Y1, X2, -Y2))
+                            {
                                 tracks += ($"  (gr_line (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}))\n");
+                                track_count++;
+                            }
                         }
                     }
                     else
                     {
                         tracks += ($"  (segment (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}) (net {net}))\n");
+                        track_count++;
                     }
                     //                    }
                 }

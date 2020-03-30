@@ -69,37 +69,44 @@ namespace ConvertToKicad
 
         static bool ProcessModelsFile(string filename)
         {
-            FileInfo file = new System.IO.FileInfo(filename);
-            long size = new System.IO.FileInfo(filename).Length;
-
-            using (FileStream fs = file.OpenRead())
+            try
             {
-                UInt32 pos = 0;
-                UInt32 Component = 0;
-                BinaryReader br = new BinaryReader(fs, System.Text.Encoding.UTF8);
-                while (pos < size)
+                FileInfo file = new System.IO.FileInfo(filename);
+                long size = new System.IO.FileInfo(filename).Length;
+
+                using (FileStream fs = file.OpenRead())
                 {
-                    fs.Seek(pos, SeekOrigin.Begin);
-                    uint next = br.ReadUInt32();
-                    char[] line = br.ReadChars((int)next);
-                    string str = new string(line);
-                    Model Model = new Model(str, Component);
-                    try
+                    UInt32 pos = 0;
+                    UInt32 Component = 0;
+                    BinaryReader br = new BinaryReader(fs, System.Text.Encoding.UTF8);
+                    while (pos < size)
                     {
-                        string f = Model.FileName;
-                        if (!File.Exists(f))
-                            // rename the file
-                            File.Move($"{Component}.step", f);
-                        else
-                            File.Delete($"{Component}.step");
+                        fs.Seek(pos, SeekOrigin.Begin);
+                        uint next = br.ReadUInt32();
+                        char[] line = br.ReadChars((int)next);
+                        string str = new string(line);
+                        Model Model = new Model(str, Component);
+                        try
+                        {
+                            string f = Model.FileName;
+                            if (!File.Exists(f))
+                                // rename the file
+                                File.Move($"{Component}.step", f);
+                            else
+                                File.Delete($"{Component}.step");
+                        }
+                        catch (Exception Ex)
+                        {
+                            CheckThreadAbort(Ex);
+                        }
+                        pos += next + 4;
+                        Component++;
                     }
-                    catch (Exception Ex)
-                    {
-                        CheckThreadAbort(Ex);
-                    }
-                    pos += next + 4;
-                    Component++;
                 }
+            }
+            catch (Exception Ex)
+            {
+                CheckThreadAbort(Ex, "Couldn't find models data.dat file");
             }
             return true;
         }
@@ -107,7 +114,7 @@ namespace ConvertToKicad
         // class for the 3D models document entry in the pcbdoc file
         class Models6 : PcbDocEntry
         {
-            public Models6(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Models6(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
             }
 

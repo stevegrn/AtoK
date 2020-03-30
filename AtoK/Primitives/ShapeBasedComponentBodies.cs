@@ -11,7 +11,7 @@ namespace ConvertToKicad
         class ShapeBasedComponentBodies : PcbDocEntry
         {
             // variable entry size
-            public ShapeBasedComponentBodies(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public ShapeBasedComponentBodies(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
                 Binary_size = 1;
             }

@@ -11,7 +11,7 @@ namespace ConvertToKicad
         // class for the net classes document entry in the pcbdoc file
         class Classes : PcbDocEntry
         {
-            public Classes(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Classes(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
             }
 
@@ -46,7 +46,7 @@ namespace ConvertToKicad
                     string[] words = line.Split('|');
                     string name = GetString(line, "|NAME=");
 
-                    net_classes += ($" (net_class \"{name}\"  \"{name}\"\n    (clearance 0.127)\n    (trace_width 0.254)\n    (via_dia 0.889)\n    (via_drill 0.635)\n    (uvia_dia 0.508)\n    (uvia_drill 0.127)\n");
+                    net_classes += ($"  (net_class \"{name}\"  \"{name}\"\n    (clearance 0.127)\n    (trace_width 0.254)\n    (via_dia 0.889)\n    (via_drill 0.635)\n    (uvia_dia 0.508)\n    (uvia_drill 0.127)\n");
                     for (int c = 10; c < words.Length - 1; c++)
                     {
                         split = words[c].Split('=');

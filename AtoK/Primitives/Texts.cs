@@ -8,6 +8,44 @@ namespace ConvertToKicad
 {
     public partial class ConvertPCBDoc
     {
+        // add \ to any illegal characters (e.g. ") in the string
+        static string ToLiteral(string input)
+        {
+            StringBuilder literal = new StringBuilder(input.Length + 2);
+            foreach (var c in input)
+            {
+                switch (c)
+                {
+                    case '\'': literal.Append(@"\'"); break;
+                    case '\"': literal.Append(@"\"""); break;
+                    //    case '\\': literal.Append(@"\\"); break;
+                    case '\0': literal.Append(@"\0"); break;
+                    case '\a': literal.Append(@"\a"); break;
+                    case '\b': literal.Append(@"\b"); break;
+                    case '\f': literal.Append(@"\f"); break;
+                    case '\n': literal.Append(@"\n"); break;
+                    case '\r': literal.Append(@"\r"); break;
+                    case '\t': literal.Append(@"\t"); break;
+                    case '\v': literal.Append(@"\v"); break;
+                    default:
+                        // ASCII printable character
+                        if (c >= 0x20 && c <= 0x7e)
+                        {
+                            literal.Append(c);
+                            // As UTF16 escaped character
+                        }
+                        else
+                        {
+                            literal.Append(@"\u");
+                            literal.Append(((int)c).ToString("x4"));
+                        }
+                        break;
+                }
+            }
+            return literal.ToString();
+        }
+
+
         // class for text objects
         class String : Object
         {
@@ -40,12 +78,12 @@ namespace ConvertToKicad
             {
                 Reference = reference;
                 Value = ToLiteral(value);
-                X = x; // absolute poisition of string
+                X = x; // absolute position of string
                 Y = y;
                 Layer = layer;
-                SizeX = sizeX;
-                SizeY = sizeY;
-                Thickness = thickness;
+                SizeX = Math.Round(sizeX, Precision);
+                SizeY = Math.Round(sizeY, Precision);
+                Thickness = Math.Round(thickness, Precision);
                 Rotation = rotation;
                 Rotation %= 360;
                 Hide = hide;
@@ -129,7 +167,7 @@ namespace ConvertToKicad
                     {
                         case ".layer_name": name = layer; break;
                         case ".designator": if ((Component != -1) && (ModulesL[Component].Designator != null)) name = ModulesL[Component].Designator; break;
-                        case ".comment": if ((Component != -1) && (ModulesL[Component].Designator != null)) name = ModulesL[Component].Comment; break;
+                        case ".comment": if ((Component != -1) && (ModulesL[Component].Comment != null)) name = ModulesL[Component].Comment; break;
                         default: break;
                     }
                 }
@@ -137,7 +175,7 @@ namespace ConvertToKicad
             }
 
 
-            public Texts(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Texts(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
                 Binary_size = 1; // variable record length
             }
@@ -152,6 +190,7 @@ namespace ConvertToKicad
 
                 long p = 0;
                 Int32 len;
+                string str = "";
                 try
                 {
                     using (MemoryStream ms = new MemoryStream(data))
@@ -188,14 +227,14 @@ namespace ConvertToKicad
                             byte[] textbytes = br.ReadBytes(strlen);
                             p = ms.Position; // now at end of record
 
-                            string str = Encoding.UTF8.GetString(textbytes, 0, strlen);
+                            str = Encoding.UTF8.GetString(textbytes, 0, strlen);
                             string layer = Brd.GetLayer(Layer);
 
                             str = ConvertSpecialStrings(str, Component, layer);
                             if (TrueType)
                             {
                                 Thickness = Height / 10;    // fudge to get width the same as stroke font
-                                Height = Height / 1.86;     // fudge to get height the same as stroke font
+                                Height = Height / 2.2;     // fudge to get height the same as stroke font
                             }
 
                             str = str.Replace("\r", "");
@@ -243,7 +282,7 @@ namespace ConvertToKicad
                                         // Virtual designator TODO get this from board info
                                         str = str.Substring(0, str.IndexOf('_'));
                                     }
-                                    Mod.Comment = str;
+                                    Mod.Comment = ToLiteral(str);
                                 }
                                 else
                                 {

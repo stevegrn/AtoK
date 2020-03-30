@@ -127,6 +127,12 @@
     <Compile Include="OpenMcdf\SectorCollection.cs" />
     <Compile Include="OpenMcdf\StreamRW.cs" />
     <Compile Include="OpenMcdf\StreamView.cs" />
+    <Compile Include="Options.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Options.Designer.cs">
+      <DependentUpon>Options.cs</DependentUpon>
+    </Compile>
     <Compile Include="Primitives\Arcs.cs" />
     <Compile Include="Primitives\Classes.cs" />
     <Compile Include="Primitives\ComponentBodies.cs" />
@@ -134,7 +140,6 @@
     <Compile Include="Primitives\Dimensions.cs" />
     <Compile Include="Primitives\Fills.cs" />
     <Compile Include="Primitives\Models.cs" />
-    <Compile Include="Primitives\Modules.cs" />
     <Compile Include="Primitives\Nets.cs" />
     <Compile Include="Primitives\Pads.cs" />
     <Compile Include="Primitives\Polygons.cs" />
@@ -163,6 +168,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Options.resx">
+      <DependentUpon>Options.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx" />
   </ItemGroup>

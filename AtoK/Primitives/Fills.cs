@@ -79,7 +79,7 @@ namespace ConvertToKicad
             int Locked;
             int Keepout;
 
-            public Fills(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Fills(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
                 //record length 47
                 Binary_size = 47;

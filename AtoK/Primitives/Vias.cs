@@ -43,7 +43,7 @@ namespace ConvertToKicad
             {
                 string StartL = Brd.GetLayer(StartLayer);
                 string EndL = Brd.GetLayer(EndLayer);
-                string blind = ((StartL != "F.Cu") || (EndL != "B.Cu")) ? "blind" : "";
+                string blind = "blind"; // ((StartL != "F.Cu") || (EndL != "B.Cu")) ? "blind" : "";
                 return $"  (via {blind} (at {Math.Round(X, Precision)} {Math.Round(-Y, Precision)}) (size {Size}) (drill {Drill}) (layers {StartL} {EndL}) (net {Net}))\n";
             }
         }
@@ -75,7 +75,7 @@ namespace ConvertToKicad
                 public fixed Int32 LayerSizes[32];  //  50 128 pad size on layers top, mid1,...mid30, bottom 
             }
 
-            public Vias(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Vias(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
                 Binary_size = 208;
             }

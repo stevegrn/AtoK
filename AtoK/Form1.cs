@@ -16,6 +16,8 @@ namespace AtoK
 
     public partial class Form1 : Form
     {
+        public static string PcbNewLocation="";
+        public static string TextEditorLocation = "";
         ConcurrentQueue<string> dq = new ConcurrentQueue<string>();
         //       Stream myStream;
         //        StreamWriter myWriter;
@@ -307,16 +309,24 @@ namespace AtoK
                 this.WindowState = Properties.Settings.Default.F1State;
 
                 // we don't want a minimized window at startup
-                if (this.WindowState == FormWindowState.Minimized) this.WindowState = FormWindowState.Normal;
+                if (this.WindowState == FormWindowState.Minimized)
+                    this.WindowState = FormWindowState.Normal;
 
                 this.Location = Properties.Settings.Default.F1Location;
-                this.Size = Properties.Settings.Default.F1Size;
+                if (Properties.Settings.Default.F1Size.Width < Edit.Width + Edit.Location.X + 25)
+                    this.Size = new Size(Edit.Width + Edit.Location.X+25, Properties.Settings.Default.F1Size.Height);
+                else
+                    this.Size = Properties.Settings.Default.F1Size; // TODO sort out when this gets screwed 
+                this.Update();
+
             }
             SaveExtractedDocs.CheckState = Properties.Settings.Default.SaveDocs ? CheckState.Checked : CheckState.Unchecked;
             LibraryGen.CheckState = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
             Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
             ConvertPCBDoc.Verbose = Verbose.CheckState == CheckState.Checked;
             string Combo = Properties.Settings.Default.ComboboxItems;
+            PcbNewLocation = Properties.Settings.Default.PcbNewLocation;
+            TextEditorLocation = Properties.Settings.Default.TextEditorLocation;
 
             string[] items = Combo.Split(';');
 
@@ -349,6 +359,8 @@ namespace AtoK
             Properties.Settings.Default.GenLib = LibraryGen.CheckState == CheckState.Checked;
             Properties.Settings.Default.Verbose = Verbose.CheckState == CheckState.Checked;
             Properties.Settings.Default.LastFile = FileHistory.Text;
+            Properties.Settings.Default.PcbNewLocation = PcbNewLocation;
+            Properties.Settings.Default.TextEditorLocation = TextEditorLocation;
 
             StringBuilder sb = new StringBuilder();
             foreach (var item in FileHistory.Items)
@@ -459,7 +471,7 @@ namespace AtoK
                 CheckPathExists = true,
 
                 DefaultExt = "pcbdoc",
-                Filter = "pcb files (*.pcbdoc)|*.pcbdoc|Circuitmaker files (*.cmpcbdoc):|*.cmpcbdoc",
+                Filter = "Circuitmaker files (*.cmpcbdoc):|*.cmpcbdoc|pcb files (*.pcbdoc)|*.pcbdoc",
                 FilterIndex = 2,
                 RestoreDirectory = true,
 
@@ -504,7 +516,7 @@ namespace AtoK
             // set left to left of form
             // set right to right of form
             control.Width = button1.Right;
-            outputList.Width = this.Width - 30;
+            outputList.Width = this.Width - 35;
             outputList.Left = FileHistory.Left;
             outputList.Top = Verbose.Bottom + 10;
             outputList.Height = control.Height - Verbose.Bottom - 50;
@@ -518,7 +530,7 @@ namespace AtoK
         private void timer1_Tick(object sender, EventArgs e)
         {
             if (button1.BackColor == Color.Green)
-                button1.BackColor = BackColor;
+                button1.BackColor = SystemColors.Control;
             else
                 button1.BackColor = Color.Green;
             if (t == null || t.IsAlive == false)
@@ -532,7 +544,7 @@ namespace AtoK
                 busy.Hide();
                 Edit.Enabled = true;
                 ClearHistory.Enabled = true;
-                button1.BackColor = BackColor;
+                button1.BackColor = SystemColors.Control;
                 this.Update();
             }
             else
@@ -562,11 +574,14 @@ namespace AtoK
                     {
                         try
                         {
-                            p.StartInfo = new ProcessStartInfo("C:\\Program Files\\KiCad\\bin\\pcbnew.exe", "\"" + output_filename + "\"");
-                            p.StartInfo.RedirectStandardOutput = false;
-                            p.StartInfo.RedirectStandardError = true;
-                            p.StartInfo.UseShellExecute = false;
-                            p.Start();
+                            if (File.Exists(PcbNewLocation))
+                            {
+                                p.StartInfo = new ProcessStartInfo(PcbNewLocation, "\"" + output_filename + "\"");
+                                p.StartInfo.RedirectStandardOutput = false;
+                                p.StartInfo.RedirectStandardError = true;
+                                p.StartInfo.UseShellExecute = false;
+                                p.Start();
+                            }
                         }
                         catch (System.ComponentModel.Win32Exception)
                         {
@@ -638,11 +653,14 @@ namespace AtoK
                     {
                         try
                         {
-                            p.StartInfo = new ProcessStartInfo("C:\\Program Files\\Notepad++\\notepad++.exe", "\"" + output_filename + "\"");
-                            p.StartInfo.RedirectStandardOutput = false;
-                            p.StartInfo.RedirectStandardError = true;
-                            p.StartInfo.UseShellExecute = false;
-                            p.Start();
+                            if (File.Exists(TextEditorLocation))
+                            {
+                                p.StartInfo = new ProcessStartInfo(TextEditorLocation, "\"" + output_filename + "\"");
+                                p.StartInfo.RedirectStandardOutput = false;
+                                p.StartInfo.RedirectStandardError = true;
+                                p.StartInfo.UseShellExecute = false;
+                                p.Start();
+                            }
                         }
                         catch (System.ComponentModel.Win32Exception)
                         {
@@ -669,6 +687,14 @@ namespace AtoK
                 FileHistory.DroppedDown = true;
 
             }
+        }
+
+        private void Options_Click(object sender, EventArgs e)
+        {
+            var OptionsForm = new Options();
+            OptionsForm.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
+            OptionsForm.Location = new System.Drawing.Point((Form1.ActiveForm.Location.X + Form1.ActiveForm.Width / 2) - (OptionsForm.Width / 2), (Form1.ActiveForm.Location.Y + Form1.ActiveForm.Height / 2) - (OptionsForm.Height / 2));
+            OptionsForm.Show();
         }
     }
 }

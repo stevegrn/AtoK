@@ -92,7 +92,7 @@ namespace ConvertToKicad
             };
 
             // record length 57
-            public Arcs(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Arcs(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
                 Binary_size = 57;
             }

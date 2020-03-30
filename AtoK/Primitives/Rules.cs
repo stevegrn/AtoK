@@ -181,7 +181,7 @@ namespace ConvertToKicad
         // class for the rules document entry in the pcbdoc file
         class Rules : PcbDocEntry
         {
-            public Rules(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Rules(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
             }
 

@@ -28,7 +28,9 @@ namespace ConvertToKicad
 
             public override string ToString()
             {
-                return $"(net {Number} \"{ Name}\")\n";
+                if (Number == 0)
+                    return "  (net 0 \"\")\n";
+                return $"  (net {Number} \"{Name}\")\n";
             }
         }
 
@@ -36,7 +38,12 @@ namespace ConvertToKicad
         class Nets : PcbDocEntry
         {
             static int net_no;
-            public Nets(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public static string GetNetName(int Net)
+            {
+                return $"\"{NetsL[Net].Name}\"";
+            }
+
+            public Nets(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
                 net_no = 0;
             }

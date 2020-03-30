@@ -213,7 +213,7 @@ namespace ConvertToKicad
                 string string1 = $@"
     (dimension 176 (width {LINEWIDTH}) (layer {layer})
       (gr_text {text} (at {TEXT1X} {-TEXT1Y} {ANGLE}) (layer {layer})
-          (effects (font (size {TEXTHEIGHT} {TEXTHEIGHT}) (thickness {LINEWIDTH})) (justify left ))
+          (effects (font (size {Math.Round(TEXTHEIGHT, Precision)} {Math.Round(TEXTHEIGHT, Precision)}) (thickness {Math.Round(LINEWIDTH, Precision)})) (justify left ))
       )
       (feature1 (pts (xy {end.X} {-end.Y}) (xy {R1.X} {-R1.Y})  ))
       (feature2 (pts  (xy {X1} {-Y1}) (xy {R0.X} {-R0.Y})))
@@ -256,7 +256,7 @@ namespace ConvertToKicad
         // class for the dimensions document entry in the pcbdoc file
         class Dimensions : PcbDocEntry
         {
-            public Dimensions(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Dimensions(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
             }
 

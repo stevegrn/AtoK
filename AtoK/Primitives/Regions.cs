@@ -50,26 +50,40 @@ namespace ConvertToKicad
                     clearance = GetRuleValue("PlaneClearance", "PlaneClearance");
                 }
 
-                if (!Keepout)
-                    Layer = "Dwgs.User";
-                ret = $"  (zone (net {Net_no}) (net_name {Net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)";
-                ret += $"    (priority 100)\n";
-                ret += $"    (connect_pads {connectstyle} (clearance {clearance}))\n"; // TODO sort out these numbers properly
-                ret += $"    (min_thickness 0.2)\n";
-                if (Keepout)
-                    ret += "(keepout(copperpour not_allowed))\n";
-                ret += "    (fill yes (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n";
-                var i = 0;
-                ret += "    (polygon (pts\n        ";
-                foreach (var Point in Points)
+                //        if (!Keepout)
+                //            Layer = "Dwgs.User";
+                if (Layer != "Edge.Cuts")
                 {
-                    i++;
-                    if ((i % 5) == 0)
-                        ret += "\n        ";
-                    ret += Point.ToString();
+                    ret = $"  (zone (net {Net_no}) (net_name {Net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)";
+                    ret += $"    (priority 100)\n";
+                    ret += $"    (connect_pads {connectstyle} (clearance {clearance}))\n"; // TODO sort out these numbers properly
+                    ret += $"    (min_thickness 0.2)\n";
+                    if (Keepout)
+                        ret += "(keepout(copperpour not_allowed))\n";
+                    string fill = (Layer == "Edge.Cuts") ? "no" : "yes";
+                    ret += $"    (fill {fill} (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n";
+                    var i = 0;
+                    ret += "    (polygon (pts\n        ";
+                    foreach (var Point in Points)
+                    {
+                        i++;
+                        if ((i % 5) == 0)
+                            ret += "\n        ";
+                        ret += Point.ToString();
+                    }
+                    ret += "\n      )\n    )\n  )\n";
                 }
-                ret += "\n      )\n    )\n  )\n";
-
+                else
+                {
+                    Point Start = new Point(0, 0);
+                    Start = Points[0];
+                    int i;
+                    for (i = 0; i < Points.Count - 1; i++)
+                    {
+                        ret += $"  (gr_line (start {Points[i].X} {-Points[i].Y}) (end {Points[i + 1].X} {-Points[i + 1].Y}) (layer Edge.Cuts) (width 0.1))\n";
+                    }
+                    ret += $"  (gr_line (start {Points[i].X} {-Points[i].Y}) (end {Start.X} {-Start.Y}) (layer Edge.Cuts) (width 0.1))\n";
+                }
                 return ret;
             }
 
@@ -132,7 +146,7 @@ namespace ConvertToKicad
             private readonly List<Point> Points;
 
             // variable length records
-            public Regions(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Regions(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
                 Binary_size = 1;
                 Points = new List<Point>();
@@ -172,14 +186,16 @@ namespace ConvertToKicad
                             if (GetString(str, "ISBOARDCUTOUT=") == "TRUE")
                                 l = "Edge.Cuts";
                             Region r = new Region(l, net, Keepout);
+
                             while (DataLen-- > 0)
                             {
-                                double X = br.ReadDouble();
-                                double Y = br.ReadDouble();
-                                r.AddPoint(ToMM(X) - originX, ToMM(Y) - originY);
+                                double X = Math.Round(ToMM(br.ReadDouble()) - originX, Precision);
+                                double Y = Math.Round(ToMM(br.ReadDouble()) - originY, Precision);
+                                if (X > 10000 || Y > 10000 || Y<0)  // TODO sort out this frig these come from second Regions append
+                                    return false;
+                                r.AddPoint(X, Y);
                             }
                             r.Keepout = Keepout;
-
 
                             if (!InComponent)
                             {

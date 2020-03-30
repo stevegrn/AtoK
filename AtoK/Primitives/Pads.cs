@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
+
 namespace ConvertToKicad
 {
     public partial class ConvertPCBDoc
@@ -54,13 +55,13 @@ namespace ConvertToKicad
                 Type = type;
                 Shape = shape;
                 RRatio = rratio;
-                X = x;
-                Y = y;
+                X = Math.Round(x, Precision);
+                Y = Math.Round(y, Precision);
                 Rotation = rotation;
                 if (Rotation > 0 && Rotation < 1)
                     Rotation = 0; // TODO fix this frig
-                SizeX = sizex;
-                SizeY = sizey;
+                SizeX = Math.Round(sizex, Precision);
+                SizeY = Math.Round(sizey, Precision);
                 Drill = drill;
                 Layer = layer;
                 Net = net;
@@ -92,7 +93,7 @@ namespace ConvertToKicad
             {
                 if (Shape == "roundrect")
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                    return $"    (pad {Number} {Type} {Shape} (at {X} {-Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
                             $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
                 }
                 else
@@ -103,19 +104,67 @@ namespace ConvertToKicad
                 }
                 else
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                    return $"    (pad {Number} {Type} {Shape} (at {X} {-Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
                             $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
                 }
             }
 
             private string DoOctagonalPad(string Number, string Type, double X, double Y, double Rotation, double SizeX, double SizeY, string Layer)
             {
+                // boy this turned out to be more complicated than I would have liked
                 double Cx, Cy;
+                double Rotate = 90;
 
-                Cx = -SizeX / 2;
-                Cy = -SizeY / 2;
-                double Size = (SizeX < SizeY) ? SizeX : SizeY;
-                double dl = Size / 4;
+                Point2D[] Points = new Point2D[8];
+                Point2D[] PadCorners = new Point2D[4];
+
+                Cx = SizeX / 4; // Math.Min(SizeX, SizeY) / 4;
+                Cy = SizeY / 2; // Math.Max(SizeX, SizeY) / 2;
+
+                Points[0] = new Point2D(-2*Cx, -(Cy-Cx));
+                Points[1] = new Point2D(-Cx, -Cy);
+                Points[2] = new Point2D(Cx, -Cy);
+                Points[3] = new Point2D(2*Cx, -(Cy-Cx));
+                Points[4] = new Point2D(2*Cx, Cy-Cx);
+                Points[5] = new Point2D(Cx, Cy);
+                Points[6] = new Point2D(-Cx, Cy);
+                Points[7] = new Point2D(-2*Cx, Cy-Cx);
+
+                PadCorners[0] = Points[0];
+                PadCorners[1] = Points[3];
+                PadCorners[2] = Points[4];
+                PadCorners[3] = Points[7];
+
+                double PadSizeX = Points[3].X - Points[0].X;
+                double PadSizeY = Points[4].Y - Points[3].Y;
+                Point2D Pad = new Point2D(PadSizeX, PadSizeY);
+
+                // now rotate by 0 or 90 depending on which is the short side
+                if(SizeY < SizeX)
+                {
+                    double t = Pad.X;
+                    Pad.X = Pad.Y;
+                    Pad.Y = t;
+                    // need to rotate by 90 before actually rotating by the pad's rotation
+                    Rotate = 0;
+                    Point2D temp = new Point2D();
+                    temp = Points[7];
+                    Points[7] = Points[5];
+                    Points[5] = Points[3];
+                    Points[3] = Points[1];
+                    Points[1] = temp;
+                    temp = Points[6];
+                    Points[6] = Points[4];
+                    Points[4] = Points[2];
+                    Points[2] = Points[0];
+                    Points[0] = temp;
+                    temp = PadCorners[3];
+                    PadCorners[3] = PadCorners[2];
+                    PadCorners[2] = PadCorners[1];
+                    PadCorners[1] = PadCorners[0];
+                    PadCorners[0] = temp;
+                }
+
                 string hole = $"(drill {Drill})";
 
                 if (Type == "smd")
@@ -123,20 +172,20 @@ namespace ConvertToKicad
 
                 // make octagonal pad out of polygon
                 string
-                ret = $"    (pad {Number} {Type} custom (at {X} {Y}  {Rotation}) (size {Size} {Size}) {hole} (layers {Layer})\n";
+                ret = $"    (pad {Number} {Type} custom (at {X} {Y}  {Rotate-Rotation}) (size {Pad.X} {Pad.Y}) {hole} (layers {Layer})\n";
                 ret += $"      (net {Net} {Net_name}) (zone_connect {Zone_connect})";
                 ret += $"      (zone_connect {Zone_connect})\n"; // 0=none 1=thermal 2=solid get from rules
                 ret += $"      (options (clearance outline) (anchor rect))\n";
                 ret += $"      (primitives\n";
                 ret += $"         (gr_poly (pts\n";
-                ret += $"         (xy {Cx} {-(Cy + dl)})\n";
-                ret += $"         (xy {Cx + dl} {-Cy})\n";
-                ret += $"         (xy {Cx + SizeX - dl} {-Cy})\n";
-                ret += $"         (xy {Cx + SizeX} {-(Cy + dl)})\n";
-                ret += $"         (xy {Cx + SizeX} {-(Cy + SizeY - dl)})\n";
-                ret += $"         (xy {Cx + SizeX - dl} {-(Cy + SizeY)})\n";
-                ret += $"         (xy {Cx + dl} {-(Cy + SizeY)})\n";
-                ret += $"         (xy {Cx} {-(Cy + SizeY - dl)})\n      )))\n    )\n";
+                ret += $"         (xy {Points[0].X} {-Points[0].Y})\n";
+                ret += $"         (xy {Points[1].X} {-Points[1].Y})\n";
+                ret += $"         (xy {Points[2].X} {-Points[2].Y})\n";
+                ret += $"         (xy {Points[3].X} {-Points[3].Y})\n";
+                ret += $"         (xy {Points[4].X} {-Points[4].Y})\n";
+                ret += $"         (xy {Points[5].X} {-Points[5].Y})\n";
+                ret += $"         (xy {Points[6].X} {-Points[6].Y})\n";
+                ret += $"         (xy {Points[7].X} {-Points[7].Y})\n      )))\n    )\n";
                 return ret;
             }
 
@@ -171,7 +220,7 @@ namespace ConvertToKicad
 
                 if (Shape == "roundrect")
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(p.X, Precision)} {-Math.Round(p.Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
                             $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
                 }
                 if (Shape == "octagonal")
@@ -266,15 +315,16 @@ namespace ConvertToKicad
                 public fixed byte U12[6];       // 135 6 ???
                 public fixed int MidLayerXSize[29]; // 141 29*4 Midlayers 2-30
                 public fixed int MidLayerYSixe[29]; // 257 29*4 MidLayers 2-30
-                public fixed byte U13[705 - 373];   // 373
-                public fixed byte RRatios[32];      // 705 RRatios for top, middle 30, and bottom layers
+                public fixed byte U13[673 - 373];   // 373
+                public fixed byte PadShapes[32];    // 673 Padshapes on 32 layers top bottom and 30 inner layers 730 for after winter09
+                public fixed byte RRatios[32];      // 705 RRatios for top, middle 30, and bottom layers 762 for after winter09
                 public fixed byte U14[849 - 737];   // 737
 
             }
 
             // just to be awkward records not same size varies with name of pad
             // entry header looks like 02 xx xx xx xx yy where yy = (byte)(xxxxxxxx) e.g. 02 03 00 00 00 02
-            public Pads(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Pads(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
                 Binary_size = 1;
             }
@@ -345,7 +395,7 @@ namespace ConvertToKicad
                                                 found = false;
                                             if (found)
                                             {
-                                                // OutputString($"Found header at {pos}");
+                                                //OutputString($"Found header at {pos:x08}");
                                                 Starts.Add(pos);
                                             }
                                         }
@@ -376,13 +426,13 @@ namespace ConvertToKicad
                                     Longest = len;
                             }
                             index = -1;
-                            string Header1 = "Pos       ";
+                            string Header1 = "Pos            ";
                             for (int i = 0; i < Longest; i++)
                                 Header1 += $"{(i / 100),-3:D2}";
-                            string Header2 = "          ";
+                            string Header2 = "               ";
                             for (int i = 0; i < Longest; i++)
                                 Header2 += $"{(i % 100),-3:D2}";
-                            string Header3 = "----------";
+                            string Header3 = "---------------";
                             for (int i = 0; i < Longest; i++)
                                 Header3 += $"---";
                             if (ExtractFiles)
@@ -394,6 +444,7 @@ namespace ConvertToKicad
                             foreach (var p in Starts)
                             {
                                 pos = p;
+                                //OutputString($"pos = {pos:x08}");
                                 index++;
                                 base.ProcessLine();
                                 //long p = pos;
@@ -437,15 +488,17 @@ namespace ConvertToKicad
                                     r = bytes; // get reference bytes
                                 string text = "";
                                 int count = 0;
+                                int CompareLimit = Math.Min(r.Length, bytes.Length);
                                 foreach (var c in bytes)
                                 {
-                                    if (count < l && r[count] != bytes[count])
-                                        text += $"->{count}";
-                                    text += $" {c:X2}";
+                                    if (count < CompareLimit && r[count] != bytes[count])
+                                        text += $"|{c:X2}";
+                                    else
+                                        text += $" {c:X2}";
                                     count++;
                                 }
                                 if (ExtractFiles)
-                                    AddText(TextFile, $"{pos:X8} " + text + "\n");
+                                    AddText(TextFile, $"{pos:X8} " + $"{name,4} " + text + "\n");
 
                                 //OutputString($"{pos:X8} " + text);
 
@@ -482,11 +535,16 @@ namespace ConvertToKicad
                                     }
                                 bool InComponent = Component != -1;
 
-                                if (len >= 744) // i.e. is this a rounded rectangle pad?
-                                    shape = 5; // this seems a frig as the pad shape is set 1 when it should be 5
+                                unsafe
+                                {
+                                    if (len >= 744) // i.e. is this a rounded rectangle pad?
+                                        shape = pad.PadShapes[0]; // this seems a frig as the pad shape is set 1 when it should be 5
+                                }
+                                if (shape == 9)
+                                    shape = 5;
                                 string[] shapes = { "circle", "circle", "rect", "octagonal", "oval", "roundrect" };
                                 if (shapes[shape] == "circle" && XSize != YSize)
-                                    shape = 4;
+                                    shape = 4; // oval pad
                                 string type;
                                 if (Layer == Layers.Multi_Layer)
                                 {

@@ -17,6 +17,8 @@ namespace ConvertToKicad
             string Layer { get; set; }
             public bool InComponent { get; set; }
             public int Component { get; set; }
+            public bool IsSplitPlane { get; set; }
+            public double TrackWidth { get; set; }
 
             public void AddPoint(double X, double Y)
             {
@@ -38,6 +40,7 @@ namespace ConvertToKicad
                 {
                     net = Convert.ToInt32(param) + 1;
                 }
+                string Net = GetNetName(net);
                 if ((param = GetString(line, "|COMPONENT=")) != "")
                 {
                     Component = Convert.ToInt32(param);
@@ -47,6 +50,13 @@ namespace ConvertToKicad
                 {
                     Layer = Brd.GetLayer(param);
                 }
+                IsSplitPlane = ((param = GetString(line, "|POLYGONTYPE=")) == "Split Plane");
+                if (!IsSplitPlane && (param = GetString(line, "|TRACKWIDTH=")) != "")
+                {
+                    TrackWidth = Convert.ToDouble(GetNumberInMM(param));
+                }
+                else
+                    TrackWidth = 0.1; // maybe should be smaller for split plane
 
                 NetNo = net;
                 NetName = GetNetName(NetNo);
@@ -85,7 +95,7 @@ namespace ConvertToKicad
                 ret = $"  (zone (net {NetNo}) (net_name {NetName}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)";
                 ret += $"    (priority 100)\n";
                 ret += $"    (connect_pads {connectstyle} (clearance {clearance}))\n"; // TODO sort out these numbers properly
-                ret += $"    (min_thickness 0.2)\n";
+                ret += $"    (min_thickness {TrackWidth})\n";
                 ret += "    (fill yes (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n";
                 var i = 0;
                 ret += "    (polygon (pts\n        ";
@@ -97,6 +107,8 @@ namespace ConvertToKicad
                     ret += Point.ToString();
                 }
                 ret += "\n      )\n    )\n  )\n";
+                if (IsSplitPlane)
+                    ret += "# Split Plane\n";
 
                 return ret;
             }
@@ -129,7 +141,7 @@ namespace ConvertToKicad
         // class for the polygons document entry in the pcbdoc file
         class Polygons : PcbDocEntry
         {
-            public Polygons(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public Polygons(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
             }
 

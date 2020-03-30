@@ -166,5 +166,29 @@ namespace AtoK.Properties {
                 this["CBoxItems"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string PcbNewLocation {
+            get {
+                return ((string)(this["PcbNewLocation"]));
+            }
+            set {
+                this["PcbNewLocation"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string TextEditorLocation {
+            get {
+                return ((string)(this["TextEditorLocation"]));
+            }
+            set {
+                this["TextEditorLocation"] = value;
+            }
+        }
     }
 }

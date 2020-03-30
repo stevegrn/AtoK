@@ -119,7 +119,7 @@ namespace ConvertToKicad
             */
 
             // variable entry size
-            public ComponentBodies(string filename, string record, Type type, int offset) : base(filename, record, type, offset)
+            public ComponentBodies(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
                 Binary_size = 1;
             }
