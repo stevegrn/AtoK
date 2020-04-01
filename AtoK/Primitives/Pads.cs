@@ -113,57 +113,23 @@ namespace ConvertToKicad
             {
                 // boy this turned out to be more complicated than I would have liked
                 double Cx, Cy;
-                double Rotate = 90;
 
                 Point2D[] Points = new Point2D[8];
-                Point2D[] PadCorners = new Point2D[4];
 
-                Cx = SizeX / 4; // Math.Min(SizeX, SizeY) / 4;
-                Cy = SizeY / 2; // Math.Max(SizeX, SizeY) / 2;
+                Cx = Math.Min(SizeX, SizeY) / 4;
+                Cy = SizeY / 2;
 
-                Points[0] = new Point2D(-2*Cx, -(Cy-Cx));
-                Points[1] = new Point2D(-Cx, -Cy);
-                Points[2] = new Point2D(Cx, -Cy);
-                Points[3] = new Point2D(2*Cx, -(Cy-Cx));
-                Points[4] = new Point2D(2*Cx, Cy-Cx);
-                Points[5] = new Point2D(Cx, Cy);
-                Points[6] = new Point2D(-Cx, Cy);
-                Points[7] = new Point2D(-2*Cx, Cy-Cx);
-
-                PadCorners[0] = Points[0];
-                PadCorners[1] = Points[3];
-                PadCorners[2] = Points[4];
-                PadCorners[3] = Points[7];
+                Points[0] = new Point2D(-SizeX/2, -(Cy-Cx));
+                Points[1] = new Point2D(-SizeX/2+Cx, -Cy);
+                Points[2] = new Point2D(SizeX / 2 - Cx, -Cy);
+                Points[3] = new Point2D(SizeX / 2, -(Cy - Cx));
+                Points[4] = new Point2D(SizeX / 2, Cy-Cx);
+                Points[5] = new Point2D(SizeX / 2 - Cx, Cy);
+                Points[6] = new Point2D(-SizeX / 2 + Cx, Cy);
+                Points[7] = new Point2D(-SizeX / 2, (Cy - Cx));
 
                 double PadSizeX = Points[3].X - Points[0].X;
                 double PadSizeY = Points[4].Y - Points[3].Y;
-                Point2D Pad = new Point2D(PadSizeX, PadSizeY);
-
-                // now rotate by 0 or 90 depending on which is the short side
-                if(SizeY < SizeX)
-                {
-                    double t = Pad.X;
-                    Pad.X = Pad.Y;
-                    Pad.Y = t;
-                    // need to rotate by 90 before actually rotating by the pad's rotation
-                    Rotate = 0;
-                    Point2D temp = new Point2D();
-                    temp = Points[7];
-                    Points[7] = Points[5];
-                    Points[5] = Points[3];
-                    Points[3] = Points[1];
-                    Points[1] = temp;
-                    temp = Points[6];
-                    Points[6] = Points[4];
-                    Points[4] = Points[2];
-                    Points[2] = Points[0];
-                    Points[0] = temp;
-                    temp = PadCorners[3];
-                    PadCorners[3] = PadCorners[2];
-                    PadCorners[2] = PadCorners[1];
-                    PadCorners[1] = PadCorners[0];
-                    PadCorners[0] = temp;
-                }
 
                 string hole = $"(drill {Drill})";
 
@@ -172,7 +138,7 @@ namespace ConvertToKicad
 
                 // make octagonal pad out of polygon
                 string
-                ret = $"    (pad {Number} {Type} custom (at {X} {Y}  {Rotate-Rotation}) (size {Pad.X} {Pad.Y}) {hole} (layers {Layer})\n";
+                ret = $"    (pad {Number} {Type} custom (at {X} {Y}  {Rotation}) (size {PadSizeX} {PadSizeY}) {hole} (layers {Layer})\n";
                 ret += $"      (net {Net} {Net_name}) (zone_connect {Zone_connect})";
                 ret += $"      (zone_connect {Zone_connect})\n"; // 0=none 1=thermal 2=solid get from rules
                 ret += $"      (options (clearance outline) (anchor rect))\n";
@@ -258,12 +224,7 @@ namespace ConvertToKicad
         // class for the pads document entry in the pcbdoc file
         class Pads : PcbDocEntry
         {
-            // TODO change the following comments to reflect the new way of getting the size
-            // based on the revision of Altium which the board was saved
-            // Layout of memory after the pad name string
-            // normally 141 bytes long but if it is a surface mount pad and it has a hole shape which is not round
-            // or it has the plated attribute set then the record size becomes 737 for some bizarre reason
-            // layout for Winter 09
+            // this struct for Altium versions up and including Summer 09
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
             unsafe struct PadStruct
             {
@@ -316,10 +277,71 @@ namespace ConvertToKicad
                 public fixed int MidLayerXSize[29]; // 141 29*4 Midlayers 2-30
                 public fixed int MidLayerYSixe[29]; // 257 29*4 MidLayers 2-30
                 public fixed byte U13[673 - 373];   // 373
-                public fixed byte PadShapes[32];    // 673 Padshapes on 32 layers top bottom and 30 inner layers 730 for after winter09
-                public fixed byte RRatios[32];      // 705 RRatios for top, middle 30, and bottom layers 762 for after winter09
-                public fixed byte U14[849 - 737];   // 737
+                public fixed byte PadShapes[32];    // 673 Padshapes on 32 layers top bottom and 30 inner layers
+                public fixed byte RRatios[32];      // 705 RRatios for top, middle 30, and bottom layers
+                public fixed byte U14[32];          // 743 ???
+                public fixed byte U15[1];           // 737 ???
+                public fixed byte U16[1];           // 738 ???
+            }
 
+            // After Winter 09 pad structure slightly different...grrr
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            unsafe struct PadStructPost09
+            {
+                public fixed byte U0[23];       //  0  23 ???
+                public byte Layer;              //  23 1 layer
+                public short U1;                //  24 2 Flags
+                                                //       bit 4 0=locked
+                                                //       bit 5 force tenting on top
+                                                //       bit 6 force tenting on bottom
+                                                //       bit 7 Test point top
+                                                //       bit 8 Test point bottom
+                public short Net;               //  26 2 net
+                public short U2;                //  28 2 ??
+                public short Component;         //  30 2 component
+                public short U3;                //  32 2 ??
+                public short U4;                //  34 2 ??
+                public int X;                   //  36 4 X
+                public int Y;                   //  40 4 Y
+                public int XSize;               //  44 4 XSize
+                public int YSize;               //  48 4 YSize
+                public int MidXSize;            //  52 4 mid X size
+                public int MidYSize;            //  56 4 mid Y size
+                public int BotXSize;            //  60 4 bottom X size
+                public int BotYSize;            //  64 4 bottom Y size
+                public int HoleSize;            //  68 4 holesize
+                public byte TopShape;           //  72 1 top shape
+                public byte MidShape;           //  73 1 middle shape
+                public byte BotShape;           //  74 1 bottom shape
+                public double Rotation;         //  75 8 rotation
+                public byte Plated;             //  83 1 plated
+                public byte U7;                 //  84 1 ???
+                public byte PadMode;            //  85 1 PadMode
+                public fixed byte U8[5];        //  86 5 ???
+                public int CCW;                 //  91 4 CCW
+                public byte CEN;                //  95 1 CEN
+                public byte U9;                 //  96 1 ???
+                public int CAG;                 //  97 4 CAG
+                public int CPR;                 // 101 4 CPR
+                public int CPC;                 // 105 4 CPC
+                public int PasteMaskExpansion;  // 109 4 paste mask expansion  (CPE)
+                public int SolderMaskExpansion; // 113 4 solder mask expansion (CSE)
+                public byte CPL;                // 117 1 CPL
+                public fixed byte U10[6];       // 118 6 ???
+                public byte UsePasteMaskRules;  // 124 1 use paste expansion rules (CPEV)
+                public byte UseSolderMaskRules; // 125 1 use solder mask expansion rules (CSEV)
+                public fixed byte U11[3];       // 126 7 ??? 
+                public int HoleRotation;        // 129 4 hole rotation
+                public short JumperID;          // 133 2 jumper ID
+                public fixed byte U12[6];       // 135 6 ???
+                public fixed int MidLayerXSize[29]; // 141 29*4 Midlayers 2-30
+                public fixed int MidLayerYSixe[29]; // 257 29*4 MidLayers 2-30
+                public fixed byte U13[679 - 373];   // 373
+                public fixed byte PadShapes[32];    // 679 Padshapes on 32 layers top bottom and 30 inner layers
+                public fixed byte RRatios[32];      // 712 RRatios for top, middle 30, and bottom layers 711 for after winter09
+                public fixed byte U14[32];          // 743 ???
+                public fixed byte U15[1];           // 775 ???
+                public fixed byte U16[1];           // 776 ???
             }
 
             // just to be awkward records not same size varies with name of pad
@@ -426,13 +448,13 @@ namespace ConvertToKicad
                                     Longest = len;
                             }
                             index = -1;
-                            string Header1 = "Pos            ";
+                            string Header1 = "Pos                 ";
                             for (int i = 0; i < Longest; i++)
                                 Header1 += $"{(i / 100),-3:D2}";
-                            string Header2 = "               ";
+                            string Header2 = "                    ";
                             for (int i = 0; i < Longest; i++)
                                 Header2 += $"{(i % 100),-3:D2}";
-                            string Header3 = "---------------";
+                            string Header3 = "--------------------";
                             for (int i = 0; i < Longest; i++)
                                 Header3 += $"---";
                             if (ExtractFiles)
@@ -444,11 +466,8 @@ namespace ConvertToKicad
                             foreach (var p in Starts)
                             {
                                 pos = p;
-                                //OutputString($"pos = {pos:x08}");
                                 index++;
                                 base.ProcessLine();
-                                //long p = pos;
-                                //ms.Seek(pos, SeekOrigin.Begin);
                                 ms.Seek(p, SeekOrigin.Begin);
                                 byte recordtype = br.ReadByte(); // should be 2
                                 UInt32 next = br.ReadUInt32();
@@ -498,17 +517,10 @@ namespace ConvertToKicad
                                     count++;
                                 }
                                 if (ExtractFiles)
-                                    AddText(TextFile, $"{pos:X8} " + $"{name,4} " + text + "\n");
-
-                                //OutputString($"{pos:X8} " + text);
+                                    AddText(TextFile, $"{pos:X8} " + $"{len,4} {name,4} " + text + "\n");
 
                                 PadStruct pad = ByteArrayToStructure<PadStruct>(bytes);
-
-                                unsafe
-                                {
-                                    if (pad.U0[0] != 1)
-                                        OutputError($"found {pad.U0[0]}");
-                                }
+                                PadStructPost09 padPost09 = ByteArrayToStructure<PadStructPost09>(bytes);
                                 Layer = (Layers)pad.Layer;
                                 Net = pad.Net;
                                 Net++;
@@ -520,6 +532,20 @@ namespace ConvertToKicad
                                 YSize = ToMM(pad.YSize);
                                 HoleSize = ToMM(pad.HoleSize);
                                 shape = pad.TopShape;
+                                if (shape == 1 && len > 160)
+                                {
+                                    int offset = (int)Marshal.OffsetOf(typeof(PadStruct), "PadShapes");
+                                    if (len >= offset)
+                                    {
+                                        unsafe
+                                        {
+                                            if (!Post09)
+                                                shape = pad.PadShapes[0];
+                                            else
+                                                shape = padPost09.PadShapes[0];
+                                        }
+                                    }
+                                }
                                 Rotation = pad.Rotation;
                                 plated = pad.Plated != 0;
                                 PasteMaskExpansion = ToMM(pad.PasteMaskExpansion);
@@ -531,15 +557,13 @@ namespace ConvertToKicad
                                 if (len > 709)
                                     unsafe
                                     {
-                                        RRatio = (double)pad.RRatios[0] / 200;
+                                        if(!Post09)
+                                            RRatio = (double)pad.RRatios[0] / 200;
+                                        else
+                                            RRatio = (double)padPost09.RRatios[0] / 200;
                                     }
                                 bool InComponent = Component != -1;
 
-                                unsafe
-                                {
-                                    if (len >= 744) // i.e. is this a rounded rectangle pad?
-                                        shape = pad.PadShapes[0]; // this seems a frig as the pad shape is set 1 when it should be 5
-                                }
                                 if (shape == 9)
                                     shape = 5;
                                 string[] shapes = { "circle", "circle", "rect", "octagonal", "oval", "roundrect" };
@@ -555,8 +579,10 @@ namespace ConvertToKicad
                                     else
                                     {
                                         type = "np_thru_hole";
-                                        name = "\"\"";
+                                    //    name = "\"\"";
                                     }
+                                    if ((int)HoleSize == 0)
+                                        OutputError($"Zero size hole through hole pad at {X} {Y}");
                                 }
                                 else
                                     type = "smd";

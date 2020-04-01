@@ -8,6 +8,7 @@ namespace ConvertToKicad
 {
     public partial class ConvertPCBDoc
     {
+        public static bool Post09;
         // class to hold version info
         class Version
         {
@@ -18,6 +19,7 @@ namespace ConvertToKicad
             Version()
             {
                 VER = "";
+                Post09 = false;
                 //FWDMSG = "";
                 //BKMSG = "";
             }
@@ -25,6 +27,7 @@ namespace ConvertToKicad
             public Version(string ver, string fwdmsg, string bkmsg)
             {
                 VER = ver.Substring(ver.IndexOf('=') + 1);
+                Post09 = false;
                 //FWDMSG = fwdmsg.Substring(fwdmsg.IndexOf('=')+1);
                 //BKMSG  = bkmsg.Substring(bkmsg.IndexOf('=')+1);
             }
@@ -172,6 +175,8 @@ namespace ConvertToKicad
                     }
                 }
                 OutputString($"Board last saved by \"Altium {Versions[Versions.Count - 1].VER}\"");
+                if (Versions[Versions.Count - 1].VER.Contains("Release"))
+                    Post09 = true;
             }
 
             public int GetPadLength()

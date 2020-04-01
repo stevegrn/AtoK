@@ -330,9 +330,21 @@ namespace AtoK
 
             string[] items = Combo.Split(';');
 
+            // remove any duplicates
+            var b = new HashSet<string>(items);
+
+            FileHistory.ContextMenu = ComboBoxMenu;
+
             FileHistory.Items.Clear();
-            FileHistory.Items.AddRange(items);
-            FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
+            FileHistory.Items.AddRange(b.ToArray());
+            if(b.ToArray().Length != items.Length)
+            {
+                // some duplicate items have been removed
+                // so selected index will no longer be valid
+                FileHistory.SelectedIndex = 0;
+            }
+            else
+                FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
             BackColor = button1.BackColor;
         }
 
@@ -471,7 +483,7 @@ namespace AtoK
                 CheckPathExists = true,
 
                 DefaultExt = "pcbdoc",
-                Filter = "Circuitmaker files (*.cmpcbdoc):|*.cmpcbdoc|pcb files (*.pcbdoc)|*.pcbdoc",
+                Filter = "Altium PCB files (*.pcbdoc, *.cmpcbdoc)|*.pcbdoc; *.cmpcbdoc",
                 FilterIndex = 2,
                 RestoreDirectory = true,
 
@@ -560,7 +572,9 @@ namespace AtoK
             Process p = new Process();
             if (FileHistory.Text != "" && File.Exists(FileHistory.Text))
             {
-                string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.LastIndexOf('.')) + "-Kicad";
+                string filename = FileHistory.Text;
+                string CM = (filename.Contains("CMPCBDoc")) ? "-CM" : "";
+                string UnpackDirectory = filename.Substring(0, filename.LastIndexOf('.')) + CM + "-Kicad";
                 if (Directory.Exists(UnpackDirectory))
                 {
                     int index = FileHistory.Text.LastIndexOf('.');
@@ -605,7 +619,9 @@ namespace AtoK
         {
             busy.Select();
             ConvertPCBDoc.OutputString("Cleaning Up");
-            string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.LastIndexOf('.')) + "-Kicad";
+            string filename = FileHistory.Text;
+            string CM = (filename.Contains("CMPCBDoc")) ? "-CM" : "";
+            string UnpackDirectory = filename.Substring(0, filename.LastIndexOf('.')) + CM + "-Kicad";
             if (Directory.Exists(UnpackDirectory))
             {
                 ConvertPCBDoc.OutputString($"Removing \"{UnpackDirectory}\"'s contents");
@@ -622,6 +638,8 @@ namespace AtoK
         private void FileHistory_SelectedIndexChanged(object sender, EventArgs e)
         {
             FileHistory.Text = FileHistory.Text;
+            Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
+            Properties.Settings.Default.Save();
         }
 
         private void ClearHistory_Click(object sender, EventArgs e)
@@ -695,6 +713,12 @@ namespace AtoK
             OptionsForm.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             OptionsForm.Location = new System.Drawing.Point((Form1.ActiveForm.Location.X + Form1.ActiveForm.Width / 2) - (OptionsForm.Width / 2), (Form1.ActiveForm.Location.Y + Form1.ActiveForm.Height / 2) - (OptionsForm.Height / 2));
             OptionsForm.Show();
+        }
+
+        private void FileHistory_MouseClick(object sender, MouseEventArgs e)
+        {
+            if(e.Button == MouseButtons.Right)
+                ComboBoxMenu.Show(FileHistory, e.Location);
         }
     }
 }

@@ -1042,7 +1042,8 @@ namespace ConvertToKicad
 
                 CompoundFile cf = new CompoundFile(filename);
                 OutputString($"Converting {filename}");
-                string UnpackDirectory = filename.Substring(0, filename.LastIndexOf('.')) + "-Kicad";
+                string CM = (filename.Contains("CMPCBDoc")) ? "-CM" : "";
+                string UnpackDirectory = filename.Substring(0, filename.LastIndexOf('.')) + CM + "-Kicad";
                 OutputString($"Output Directory \"{UnpackDirectory}\"");
                 if (!Directory.Exists(UnpackDirectory))
                 {

@@ -39,11 +39,11 @@ namespace ConvertToKicad
                 EndLayer = endlayer;
             }
 
-            override public string ToString() //double X, double Y)
+            override public string ToString()
             {
                 string StartL = Brd.GetLayer(StartLayer);
                 string EndL = Brd.GetLayer(EndLayer);
-                string blind = "blind"; // ((StartL != "F.Cu") || (EndL != "B.Cu")) ? "blind" : "";
+                string blind = ((StartL != "F.Cu") || (EndL != "B.Cu")) ? "blind" : "";
                 return $"  (via {blind} (at {Math.Round(X, Precision)} {Math.Round(-Y, Precision)}) (size {Size}) (drill {Drill}) (layers {StartL} {EndL}) (net {Net}))\n";
             }
         }
