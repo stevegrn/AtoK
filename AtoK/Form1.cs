@@ -13,11 +13,18 @@ using System.Text;
 
 namespace AtoK
 {
-
     public partial class Form1 : Form
     {
+        public enum CleanEnum
+        {
+            None,
+            Current,
+            All
+        }
+
         public static string PcbNewLocation="";
         public static string TextEditorLocation = "";
+        public static CleanEnum CleanFlag;
         ConcurrentQueue<string> dq = new ConcurrentQueue<string>();
         //       Stream myStream;
         //        StreamWriter myWriter;
@@ -88,38 +95,26 @@ namespace AtoK
         ContextMenu popUpMenu;
         ContextMenu ComboBoxMenu;
 
-        private void FileHistory_Delete(object sender, EventArgs e)
+        public void outputList_Add(string Str, Color color)
         {
-            // delete the selected item
-
-        }
-
-        private void FileHistory_Initialize()
-        {
-            ComboBoxMenu = new ContextMenu();
-            ComboBoxMenu.MenuItems.Add("&Delete", new EventHandler(FileHistory_Delete));
-            popUpMenu.MenuItems[0].Visible = true;
-            popUpMenu.MenuItems[0].Enabled = true;
-            popUpMenu.MenuItems[0].Shortcut = Shortcut.CtrlX;
-            popUpMenu.MenuItems[0].ShowShortcut = true;
-        }
-
-        public Line outputList_Add(string str, Color color)
-        {
+            Line newLine;
             Invoke((MethodInvoker)(() => outputList.BeginUpdate()));
-            Line newLine = new Line(str, color);
-            lines.Add(newLine);
-            int testWidth = TextRenderer.MeasureText(str,
-                                            outputList.Font, outputList.ClientSize,
-                                            TextFormatFlags.NoPrefix).Width;
-            if (testWidth > outputlist_width)
-                outputlist_width = testWidth;
+            string[] strings = Str.Split('\n');
+            foreach (var str in strings)
+            {
+                newLine = new Line(str, color);
+                lines.Add(newLine);
+                int testWidth = TextRenderer.MeasureText(str,
+                                                outputList.Font, outputList.ClientSize,
+                                                TextFormatFlags.NoPrefix).Width;
+                if (testWidth > outputlist_width)
+                    outputlist_width = testWidth;
 
-            Invoke((MethodInvoker)(() => outputList.HorizontalExtent = outputlist_width));
-            Invoke((MethodInvoker)(() => outputList.Items.Add(newLine)));
-            Invoke((MethodInvoker)(() => outputList_Scroll()));
-            Invoke((MethodInvoker)(() => outputList.EndUpdate()));
-            return newLine;
+                Invoke((MethodInvoker)(() => outputList.HorizontalExtent = outputlist_width));
+                Invoke((MethodInvoker)(() => outputList.Items.Add(newLine)));
+                Invoke((MethodInvoker)(() => outputList_Scroll()));
+                Invoke((MethodInvoker)(() => outputList.EndUpdate()));
+            }
         }
 
         public void outputList_Update()
@@ -373,20 +368,7 @@ namespace AtoK
             Properties.Settings.Default.LastFile = FileHistory.Text;
             Properties.Settings.Default.PcbNewLocation = PcbNewLocation;
             Properties.Settings.Default.TextEditorLocation = TextEditorLocation;
-
-            StringBuilder sb = new StringBuilder();
-            foreach (var item in FileHistory.Items)
-            {
-                if (item.ToString() != "")
-                    sb.Append(item.ToString() + ";");
-            }
-            string Items = sb.ToString();
-            char[] charsToTrim = { ';' };
-            string It = Items.Substring(0, Items.Length - 1);
-
-            Properties.Settings.Default.ComboboxItems = It;
-            Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
-
+            SaveFileHistory();
             // don't forget to save the settings
             Properties.Settings.Default.Save();
         }
@@ -405,7 +387,7 @@ namespace AtoK
             return FileHistory.Text;
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private void ConvertCancel_Click(object sender, EventArgs e)
         {
             if (button1.Text == "Cancel")
             {
@@ -416,6 +398,7 @@ namespace AtoK
                 button1.Text = "Convert";
                 busy.Select();
                 EnableControls();
+                CheckOutputDir();
                 return;
             }
             if (File.Exists(FileHistory.Text))
@@ -427,7 +410,7 @@ namespace AtoK
                 Verbose.Enabled = false;
                 FileHistory.Enabled = false;
                 //                button1.Enabled = false;
-                button2.Enabled = false;
+                SelectSource.Enabled = false;
                 CleanUp.Enabled = false;
                 LaunchPCBNew.Enabled = false;
                 Edit.Enabled = false;
@@ -444,7 +427,7 @@ namespace AtoK
                 timer1.Interval = 500;
             }
             else
-                outputList_Add("File \"{FileHistory.Text}\"doesn't exist", System.Drawing.Color.Red);
+                outputList_Add($"File \"{FileHistory.Text}\" doesn't exist", System.Drawing.Color.Red);
         }
 
         public void EnableControls()
@@ -459,8 +442,8 @@ namespace AtoK
             FileHistory.Update();
             button1.Enabled = true;
             button1.Update();
-            button2.Enabled = true;
-            button2.Update();
+            SelectSource.Enabled = true;
+            SelectSource.Update();
             CleanUp.Enabled = true;
             CleanUp.Update();
             LaunchPCBNew.Enabled = true;
@@ -471,7 +454,7 @@ namespace AtoK
             Edit.Update();
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        private void SelectSource_Click(object sender, EventArgs e)
         {
             busy.Select();
             OpenFileDialog openFileDialog1 = new OpenFileDialog
@@ -514,7 +497,7 @@ namespace AtoK
                 FileHistory.SelectedItem = 0;
                 FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
             }
-
+            CheckOutputDir();
         }
 
         private void Form1_Resize(object sender, EventArgs e)
@@ -615,9 +598,51 @@ namespace AtoK
                 ConvertPCBDoc.OutputError($"Launch failed as file \"{FileHistory.Text}\"doesn't exist");
         }
 
+        private void CleanOutput(string filename)
+        {
+            if (busy != null) busy.Select();
+            ConvertPCBDoc.OutputString("Cleaning Up");
+            string CM = (filename.Contains("CMPCBDoc")) ? "-CM" : "";
+            string UnpackDirectory = filename.Substring(0, filename.LastIndexOf('.')) + CM + "-Kicad";
+            if (Directory.Exists(UnpackDirectory))
+            {
+                ConvertPCBDoc.OutputString($"Removing \"{UnpackDirectory}\"'s contents");
+                ConvertPCBDoc.ClearFolder(UnpackDirectory);
+                ConvertPCBDoc.OutputString($"Deleting {UnpackDirectory}");
+                Directory.Delete(UnpackDirectory);
+            }
+            else
+            {
+                ConvertPCBDoc.OutputError($"Output directory \"{UnpackDirectory}\" doesn't exist");
+            }
+            CheckOutputDir();
+        }
+
+        private void CleanUpAll()
+        {
+            for(var i=0;i< FileHistory.Items.Count; i++)
+            {
+                CleanOutput(FileHistory.GetItemText(FileHistory.Items[i]));
+            }
+            CheckOutputDir();
+        }
+
         private void CleanUp_Click(object sender, EventArgs e)
         {
             busy.Select();
+            this.IsMdiContainer = true;
+            CleanUp Clean = new CleanUp();
+            //Clean.MdiParent = this;
+            Clean.ShowDialog();
+            Clean.Focus();
+            switch(CleanFlag)
+            {
+                case CleanEnum.None: break;
+                case CleanEnum.Current: CleanOutput(FileHistory.Text); break;
+                case CleanEnum.All: CleanUpAll();
+                    break;
+            }
+/*
             ConvertPCBDoc.OutputString("Cleaning Up");
             string filename = FileHistory.Text;
             string CM = (filename.Contains("CMPCBDoc")) ? "-CM" : "";
@@ -633,22 +658,7 @@ namespace AtoK
             {
                 ConvertPCBDoc.OutputError("Output directory doesn't exist");
             }
-        }
-
-        private void FileHistory_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            FileHistory.Text = FileHistory.Text;
-            Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
-            Properties.Settings.Default.Save();
-        }
-
-        private void ClearHistory_Click(object sender, EventArgs e)
-        {
-            busy.Select();
-            FileHistory.Items.Clear();
-            FileHistory.ResetText();
-            FileHistory.Items.Insert(0, FileHistory.Text);
-            FileHistory.SelectedIndex = 0;
+            */
         }
 
         private void Edit_Click(object sender, EventArgs e)
@@ -658,8 +668,12 @@ namespace AtoK
             if (FileHistory.Text != "" && File.Exists(FileHistory.Text))
             {
                 string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.LastIndexOf('.')) + "-Kicad";
-                if (Directory.Exists(UnpackDirectory))
+                if (!Directory.Exists(UnpackDirectory))
                 {
+                    ConvertPCBDoc.OutputError($"Directory \"{UnpackDirectory}\" doesn't exist");
+                }
+                else
+                { 
                     int index = FileHistory.Text.LastIndexOf('.');
                     string FileName;
                     FileName = FileHistory.Text.Substring(FileHistory.Text.LastIndexOf('\\') + 1);
@@ -689,12 +703,66 @@ namespace AtoK
             }
         }
 
+        // File History control handling
+        private void FileHistory_Delete(object sender, EventArgs e)
+        {
+            // delete the selected item
+
+        }
+
+        private void FileHistory_Initialize()
+        {
+            ComboBoxMenu = new ContextMenu();
+            ComboBoxMenu.MenuItems.Add("&Delete", new EventHandler(FileHistory_Delete));
+            popUpMenu.MenuItems[0].Visible = true;
+            popUpMenu.MenuItems[0].Enabled = true;
+            popUpMenu.MenuItems[0].Shortcut = Shortcut.CtrlX;
+            popUpMenu.MenuItems[0].ShowShortcut = true;
+        }
+
+        private void SaveFileHistory()
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (var item in FileHistory.Items)
+            {
+                if (item.ToString() != "")
+                    sb.Append(item.ToString() + ";");
+            }
+            string Items = sb.ToString();
+            char[] charsToTrim = { ';' };
+            string It = Items.Substring(0, Items.Length - 1);
+
+            Properties.Settings.Default.ComboboxItems = It;
+            Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
+            Properties.Settings.Default.Save();
+        }
+
+        void CheckOutputDir()
+        {
+            string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.LastIndexOf('.')) + "-Kicad";
+            LaunchPCBNew.Enabled = Directory.Exists(UnpackDirectory);
+            Edit.Enabled = Directory.Exists(UnpackDirectory);
+        }
+
+        private void FileHistory_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            FileHistory.Text = FileHistory.Text;
+            Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
+            Properties.Settings.Default.Save();
+            CheckOutputDir();
+        }
+
         private void FileHistory_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Delete && FileHistory.DroppedDown)
             {
                 //Remove the listitem from the combobox list
                 FileHistory.Items.RemoveAt(FileHistory.SelectedIndex);
+                if(FileHistory.SelectedIndex < 0 || FileHistory.SelectedIndex > FileHistory.Items.Count)
+                {
+                    FileHistory.SelectedIndex = 0;
+                }
+                SaveFileHistory();
 
                 //Make sure no other processing happens, ex: deleting text from combobox
                 e.Handled = true;
@@ -707,6 +775,21 @@ namespace AtoK
             }
         }
 
+        private void FileHistory_MouseClick(object sender, MouseEventArgs e)
+        {
+            if(e.Button == MouseButtons.Right)
+                ComboBoxMenu.Show(FileHistory, e.Location);
+        }
+
+        private void ClearHistory_Click(object sender, EventArgs e)
+        {
+            busy.Select();
+            FileHistory.Items.Clear();
+            FileHistory.ResetText();
+            FileHistory.Items.Insert(0, FileHistory.Text);
+            FileHistory.SelectedIndex = 0;
+        }
+
         private void Options_Click(object sender, EventArgs e)
         {
             var OptionsForm = new Options();
@@ -715,11 +798,6 @@ namespace AtoK
             OptionsForm.Show();
         }
 
-        private void FileHistory_MouseClick(object sender, MouseEventArgs e)
-        {
-            if(e.Button == MouseButtons.Right)
-                ComboBoxMenu.Show(FileHistory, e.Location);
-        }
     }
 }
 

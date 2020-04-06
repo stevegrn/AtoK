@@ -30,9 +30,9 @@ namespace ConvertToKicad
             public ComponentBody(string line)
             {
                 string Ident = GetString(line, "IDENTIFIER");
-                Ident = Ident.Substring(1, Ident.Length - 1);
                 if (Ident != "")
                 {
+                    Ident = Ident.Substring(1, Ident.Length - 1);
                     string[] chars = Ident.Split(',');
                     foreach (string c in chars)
                     {
@@ -126,6 +126,7 @@ namespace ConvertToKicad
 
             public override bool ProcessBinaryFile(byte[] data)
             {
+                StartTimer();
                 if (Binary_size == 0)
                     return false;
 

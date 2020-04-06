@@ -36,6 +36,7 @@ namespace ConvertToKicad
             string Path { get; set; }
             string Attr { get; set; }
             public double Rotation { get; set; }
+            public string ComponentKind { get; set; }
             // primitives
             public ObjectList<Line> Lines { get; set; }
             public ObjectList<Pad> Pads { get; set; }
@@ -56,6 +57,7 @@ namespace ConvertToKicad
             {
                 string param;
                 Name = GetString(line, "|PATTERN=");
+                ComponentKind = GetString(line, "|COMPONENTKIND=");
                 if (Name.Contains("\\"))
                     Name = Name.Replace("\\", "_"); // TODO check this out
                 if (Name.Contains("\""))
@@ -93,8 +95,9 @@ namespace ConvertToKicad
                 if (Layer == "F.Cu" || Layer == "B.Cu")
                     Attr = "smd";
                 else
-                    Attr = "thru_hole";
-
+                    Attr = "";
+                if (ComponentKind == "1" || ComponentKind == "2" || ComponentKind == "4")
+                    Attr = "virtual";
                 Tedit = "(tedit 0)";
                 Tstamp = "(tstamp 0)";
                 // create the object lists for this component
@@ -191,10 +194,19 @@ namespace ConvertToKicad
                 //    OutputString($"outputting {Name}");
                 try
                 {
+                    PadComparer pc = new PadComparer();
+                    // put pads in numerical order (not really necessary)
+                    Pads.Sort(pc);
+                    if(Attr=="smd")
+                        foreach (var pad in Pads)
+                            if (pad.Type == "thru_hole")
+                                Attr = "";
+
                     string ret = "";
                     ret = $"  (module \"{Name}\" (layer {Layer}) {Tedit} {Tstamp}\n";
                     ret += $"    (at {X} {-Y} {Rotation})\n";
-                    ret += $"    (attr {Attr})\n";
+                    if(Attr != "")
+                        ret += $"    (attr {Attr})\n";
 
                     // this bit is for a particular test board where the idiot had put the Comment as .designator
                     if (Strings != null)
@@ -208,9 +220,6 @@ namespace ConvertToKicad
 
                     if (Strings != null) ret += Strings.ToString(X, Y, Rotation);
 
-                    PadComparer pc = new PadComparer();
-                    // put pads in numerical order (not really necessary)
-                    Pads.Sort(pc);
 
                     if (Pads != null) ret += Pads.ToString(X, Y, Rotation);
                     // ret += Vias.ToString(X, Y, Rotation); // vias not allowed in modules...yet

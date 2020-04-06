@@ -32,20 +32,6 @@ namespace ConvertToKicad
             }
         }
 
-        // class for the differential pairs document entry in the pcbdoc file
-        class DifferentialPairs : PcbDocEntry
-        {
-            public DifferentialPairs(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
-            {
-            }
-
-            public override bool ProcessLine(string line)
-            {
-                base.ProcessLine();
-                return base.ProcessLine(line);
-            }
-        }
-
         // class for the embedded fonts document entry in the pcbdoc file (not implemented)
         class EmbeddedFonts : PcbDocEntry
         {

@@ -13,7 +13,7 @@ namespace ConvertToKicad
         class Pad : Object
         {
             public string Number { get; set; }
-            string Type { get; set; }
+            public string Type { get; set; }
             string Shape { get; set; }
             double X { get; set; }
             double Y { get; set; }
@@ -276,12 +276,13 @@ namespace ConvertToKicad
                 public fixed byte U12[6];       // 135 6 ???
                 public fixed int MidLayerXSize[29]; // 141 29*4 Midlayers 2-30
                 public fixed int MidLayerYSixe[29]; // 257 29*4 MidLayers 2-30
-                public fixed byte U13[673 - 373];   // 373
+                public fixed byte U13[29];          // 373 29*1 Midlayers 2-30 unknown
+                public fixed byte U14[673 - 402];   // 402
                 public fixed byte PadShapes[32];    // 673 Padshapes on 32 layers top bottom and 30 inner layers
                 public fixed byte RRatios[32];      // 705 RRatios for top, middle 30, and bottom layers
-                public fixed byte U14[32];          // 743 ???
-                public fixed byte U15[1];           // 737 ???
-                public fixed byte U16[1];           // 738 ???
+                public fixed byte U15[32];          // 743 ???
+                public fixed byte U16[1];           // 737 ???
+                public fixed byte U17[1];           // 738 ???
             }
 
             // After Winter 09 pad structure slightly different...grrr
@@ -359,6 +360,7 @@ namespace ConvertToKicad
 
             public override bool ProcessBinaryFile(byte[] data)
             {
+                StartTimer();
                 if (Binary_size == 0)
                     return false;
 
@@ -526,6 +528,8 @@ namespace ConvertToKicad
                                 Net++;
                                 string n = NetsL[Net].Name;
                                 Component = pad.Component;
+                                if (Component != -1 && Component != 0)
+                                    X = 0;
                                 X = ToMM(pad.X) - originX;
                                 Y = ToMM(pad.Y) - originY;
                                 XSize = ToMM(pad.XSize);
@@ -581,12 +585,14 @@ namespace ConvertToKicad
                                         type = "np_thru_hole";
                                     //    name = "\"\"";
                                     }
-                                    if ((int)HoleSize == 0)
+                                    if (HoleSize < 0.01)
                                         OutputError($"Zero size hole through hole pad at {X} {Y}");
                                 }
                                 else
                                     type = "smd";
                                 string layer = Brd.GetLayer(Layer);
+                                if (layer == "Margin") // TODO sort this keepout layer malarky
+                                    layer = "Dwgs.User";
                                 if (type == "smd")
                                     layer += layer == "F.Cu" ? " F.Mask F.Paste" : (layer == "B.Cu") ? " B.Mask B.Paste" : "";
                                 else

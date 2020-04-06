@@ -120,6 +120,7 @@ namespace ConvertToKicad
 
             public override bool ProcessFile(byte[] data)
             {
+                StartTimer();
                 FileInfo file = new System.IO.FileInfo(filename);
                 using (MemoryStream ms = new MemoryStream(data))
                 {

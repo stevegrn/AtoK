@@ -65,49 +65,7 @@ namespace ConvertToKicad
             public override void FinishOff()
             {
                 base.FinishOff();
-
-                // now go through the nets looking for differential pairs and convert to KiCad format
-                // i.e. ending in + and - rather than _N and _P
-                List<Net> pos = new List<Net>();
-                List<Net> neg = new List<Net>();
-                foreach (var net in NetsL)
-                {
-                    if (net.Name.Length > 2)
-                    {
-                        string trailing = net.Name.Substring(net.Name.Length - 2, 2);
-                        if (trailing == "_P")
-                        {
-                            // potential pair candidate
-                            pos.Add(net);
-                        }
-                        else
-                        if (trailing == "_N")
-                        {
-                            // potential pair candidate
-                            neg.Add(net);
-                        }
-                    }
-                }
-                // find pairs and rename
-                foreach (var pnet in pos)
-                {
-                    foreach (var nnet in neg)
-                    {
-                        if (pnet.Name.Substring(0, pnet.Name.Length - 2) == nnet.Name.Substring(0, nnet.Name.Length - 2))
-                        {
-                            // we've got a differential pair
-                            for (var i = 0; i < NetsL.Count; i++)
-                            {
-                                if (NetsL[i].Name == pnet.Name)
-                                    NetsL[i].Name = NetsL[i].Name.Substring(0, nnet.Name.Length - 2) + "+";
-                                if (NetsL[i].Name == nnet.Name)
-                                    NetsL[i].Name = NetsL[i].Name.Substring(0, nnet.Name.Length - 2) + "-";
-                            }
-                        }
-                    }
-                }
             }
         }
-
     }
 }

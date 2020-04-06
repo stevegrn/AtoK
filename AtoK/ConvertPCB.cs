@@ -54,14 +54,14 @@ namespace ConvertToKicad
             string text = Ex.ToString();
             int index = text.IndexOf("line");
             string line = text.Substring(index);
-//            int index = 
-//            int line = Convert.ToInt32(text.Substring(text.IndexOf("line")).Substring(0, text.Substring(text.IndexOf("line")).ToString().IndexOf("\r\n")).Replace("line ", ""));
+            //            int index = 
+            //            int line = Convert.ToInt32(text.Substring(text.IndexOf("line")).Substring(0, text.Substring(text.IndexOf("line")).ToString().IndexOf("\r\n")).Replace("line ", ""));
             if (Ex.Message == "Thread was being aborted.")
             {
                 throw Ex;
             }
             else
-                OutputError(Ex.Message+$" at { line}");
+                OutputError(Ex.StackTrace); // OutputError(Ex.Message+$" at { line}");
         }
 
         static void CheckThreadAbort(Exception Ex, string text)
@@ -547,12 +547,17 @@ namespace ConvertToKicad
             private readonly int offset;
             public UInt32 Binary_size { get; set; }
             private int Processed;
-
+            private Stopwatch watch;
             List<byte[]> binary;
 
             public PcbDocEntry()
             {
                 Processed = 0;
+            }
+
+            public void StartTimer()
+            {
+                watch.Start();
             }
 
             public PcbDocEntry(string filename, string cmfilename, string record, Type type, int off)
@@ -564,6 +569,7 @@ namespace ConvertToKicad
                 Type = type;
                 offset = off;
                 Binary_size = 0;
+                watch = new Stopwatch();
             }
 
             public virtual bool ProcessBinaryFile(byte[] data)
@@ -571,6 +577,7 @@ namespace ConvertToKicad
                 if (Binary_size == 0)
                     return false;
 
+                watch.Start();
                 MemoryStream ms = new MemoryStream(data);
                 long size = ms.Length;
                 if (size == 0)
@@ -601,6 +608,7 @@ namespace ConvertToKicad
 
             public virtual bool ProcessFile(byte[] data)
             {
+                watch.Start();
                 if ((Binary_size != 0) && (Type == Type.binary))
                 {
                     return ProcessBinaryFile(data);
@@ -640,6 +648,12 @@ namespace ConvertToKicad
                 return true;
             }
 
+            public virtual bool ProcessFile()
+            {
+                watch.Start();
+                return true;
+            }
+
             public virtual bool ProcessLine(string line)
             {
                 return true;
@@ -669,7 +683,7 @@ namespace ConvertToKicad
             {
                 if (!Program.ConsoleApp)
                     // show progress if GUI
-                    OutputString($"Processed {Processed} Objects");
+                    OutputString($"Processed {Processed} Objects in {watch.ElapsedMilliseconds} mS");
             }
         }
 
@@ -1006,6 +1020,7 @@ namespace ConvertToKicad
                     new Rules                    ("Rules6",                       "C27718A40C94421388FAE5BD7785D7", "Rule",                     Type.text,   6),
                     new Classes                  ("Classes6",                     "4F71DD45B09143988210841EA1C28D", "Class",                    Type.text,   4),
                     new Nets                     ("Nets6",                        "35D7CF51BB9B4875B3A138B32D80DC", "Net",                      Type.text,   4),
+                    new DifferentialPairs        ("DifferentialPairs6",           "17DC1EE78CF64F22A78C16A208DE80", "DifferentialPair",         Type.text,   4),
                     new Components               ("Components6",                  "F9D060ACC7DD4A85BC73CB785BAC81", "Component",                Type.text,   4),
                     new Polygons                 ("Polygons6",                    "A1931C8B0B084A61AA45146575FDD3", "Polygon",                  Type.text,   4),
                     new Dimensions               ("Dimensions6",                  "068B9422DBB241258BA2DE9A6BA1A6", "Embedded",                 Type.text,   6),
@@ -1015,7 +1030,6 @@ namespace ConvertToKicad
                     new Tracks                   ("Tracks6",                      "412A754DBB864645BF01CD6A80C358", "Track",                    Type.binary, 4),
                     new Texts                    ("Texts6",                       "A34BC67C2A5F408D8F377378C5C5E2", "Text",                     Type.binary, 4),
                     new Fills                    ("Fills6",                       "6FFE038462A940E9B422EFC8F5D85E", "Fill",                     Type.binary, 4),
-                    new DifferentialPairs        ("DifferentialPairs6",           "17DC1EE78CF64F22A78C16A208DE80", "DifferentialPair",         Type.text,   4),
                     new Regions                  ("Regions6",                     "F513A5885418472886D3EF18A09E46", "Region",                   Type.binary, 4),
                     new Models6                  ("Models",                       "0DB009C021D946C88F1B3A32DAE94B", "ComponentBody",            Type.text,   4),
                     new ComponentBodies          ("ComponentBodies6",             "A0DB41FBCB0D49CE8C32A271AA7EF5", "ComponentBody",            Type.binary, 4),

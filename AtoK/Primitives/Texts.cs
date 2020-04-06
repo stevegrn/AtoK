@@ -182,7 +182,7 @@ namespace ConvertToKicad
 
             public override bool ProcessBinaryFile(byte[] data)
             {
-
+                StartTimer();
                 if (Binary_size == 0)
                     return false;
 
@@ -201,6 +201,7 @@ namespace ConvertToKicad
                         BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
                         while (p < size)
                         {
+                            base.ProcessLine(); // keep count
                             byte record_type = br.ReadByte();
                             if (record_type != 5)
                                 break;
@@ -245,7 +246,7 @@ namespace ConvertToKicad
                                 double X1 = Height / 2 * Math.Cos(Angle);
                                 double Y1 = Height / 2 * Math.Sin(Angle);
 
-                                texts += $"  (gr_text \"{str}\" (at {Math.Round(X - X1, Precision)} {-Math.Round(Y + Y1, Precision)} {Rotation})  (layer {layer}) (effects (font (size {Height} {Height}) (thickness {Thickness})) (justify left {(Mirror ? "mirror" : "")})))\n";
+                                texts += $"  (gr_text \"{ToLiteral(str)}\" (at {Math.Round(X - X1, Precision)} {-Math.Round(Y + Y1, Precision)} {Rotation})  (layer {layer}) (effects (font (size {Height} {Height}) (thickness {Thickness})) (justify left {(Mirror ? "mirror" : "")})))\n";
                             }
                             else
                             {

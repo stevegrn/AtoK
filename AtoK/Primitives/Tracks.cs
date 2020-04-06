@@ -127,7 +127,6 @@ namespace ConvertToKicad
                         tracks += ($"  (segment (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}) (net {net}))\n");
                         track_count++;
                     }
-                    //                    }
                 }
                 else
                 {

@@ -18,6 +18,7 @@ namespace ConvertToKicad
 
             public override bool ProcessBinaryFile(byte[] data)
             {
+                StartTimer();
                 if (Binary_size == 0)
                     return false;
 

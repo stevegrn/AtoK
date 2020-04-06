@@ -133,7 +133,7 @@ namespace ConvertToKicad
 
             public void BoardAddLine(double x1, double y1, double x2, double y2)
             {
-                if (Length(x1, y1, x2, y2) <= 0.001)
+                if (Length(x1, y1, x2, y2) <= 0.01)
                 {
                     OutputError($"Rejected zero length line in boundary at {x1} {y1} {x2} {y2}");
                     return;
@@ -159,7 +159,7 @@ namespace ConvertToKicad
 
             public void BoardAddArc(double X1, double Y1, double X2, double Y2, double Angle)
             {
-                if (ArcLength(X1, Y1, X2, Y2, Angle)<=0.001)
+                if (ArcLength(X1, Y1, X2, Y2, Angle)<=0.01)
                 {
                     OutputError($"Rejected zero length arc in boundary {X1} {Y1} {X2} {Y2} {Angle}");
                     return;
@@ -172,7 +172,7 @@ namespace ConvertToKicad
             {
                 foreach (var Arc in BoundaryObjects)
                 {
-                    if (Arc.X1 == x1 && Arc.Y1 == y1 && Arc.X2 == x2 && Arc.Y2 == y2 && Arc.Angle == angle)
+                    if (Arc.Angle == angle && Arc.X1 == x1 && Arc.Y1 == y1 && Arc.X2 == x2 && Arc.Y2 == y2)
                         return true;
                 }
                 return false;
@@ -342,6 +342,12 @@ namespace ConvertToKicad
             {
                 string Layers = "";
                 int i = 0;
+                if(OrderedLayers.Count % 2 == 1)
+                {
+                    // odd number of layers not allowed in PCBNew so insert one
+                    OrderedLayers.Insert(OrderedLayers.Count - 1, OrderedLayers[InnerLayerCount - 2]);
+                    OrderedLayers[OrderedLayers.Count - 2].PcbNewLayer = $"In{OrderedLayers.Count - 2}.Cu";
+                }
                 foreach (Layer Layer in OrderedLayers)
                 {
                     string Type = "";

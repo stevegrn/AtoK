@@ -180,6 +180,7 @@ namespace ConvertToKicad
                             ms.Seek(0x16, SeekOrigin.Begin);
                             byte[] bytes = br.ReadBytes(strlen);
                             string str = ConvertToString(bytes);
+                            string[] words = str.Split('|');
                             ms.Seek(0x16 + strlen, SeekOrigin.Begin);
                             Int32 DataLen = br.ReadInt32();
                             string l = Brd.GetLayer((Layers)Layer);
@@ -223,7 +224,7 @@ namespace ConvertToKicad
 
             public override bool ProcessBinaryFile(byte[] data)
             {
-
+                StartTimer();
                 if (Binary_size == 0)
                     return false;
 
