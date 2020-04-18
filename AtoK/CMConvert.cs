@@ -27,16 +27,16 @@ namespace ConvertToKicad
                 // directory already exists so merge data onto existing file
                 OutputError($"renaming '{orig}' failed as '{newdir}' already exists");
                 long before = new System.IO.FileInfo($"{newdir}\\data.dat").Length;
-                AppendData($"{newdir}\\data.dat", data);
-                ClearFolder(orig);
-                Directory.Delete(orig);
+    //            AppendData($"{newdir}\\data.dat", data);
+    //            ClearFolder(orig);
+    //            Directory.Delete(orig);
                 OutputString($"Deleted {orig}");
                 long after = new System.IO.FileInfo($"{newdir}\\data.dat").Length;
                 OutputString($"Appended {after - before} bytes to {newdir}\\data.dat");
             }
             else
             {
-                Directory.Move(orig, newdir);
+   //             Directory.Move(orig, newdir);
                 OutputString($"Renamed {orig} to '{newdir}");
             }
         }
@@ -262,7 +262,7 @@ namespace ConvertToKicad
             string CurrentDir = "";
             foreach (var entry in entries)
             {
-                if (entry.Name == "Root Entry")
+                if (false && entry.Name == "Root Entry")
                 {
                     DirectoryInfo Info = Directory.CreateDirectory(entry.Name);
                     if(!Info.Exists)
@@ -278,7 +278,7 @@ namespace ConvertToKicad
                     if (entry.StgType == StgType.StgStorage)
                     {
                         CurrentDir = entry.Name;
-                        Directory.CreateDirectory(entry.Name);
+      //                  Directory.CreateDirectory(entry.Name);
                         CFStorage storage = cf.RootStorage.TryGetStorage(entry.Name);
                         CFStream datastream = storage.GetStream("Data");
                         // get file contents and write to file
@@ -287,12 +287,12 @@ namespace ConvertToKicad
                         {
                             OutputString($"Deleted '{CurrentDir}' no data");
                             // remove empty directory
-                            Directory.Delete(CurrentDir);
+       //                     Directory.Delete(CurrentDir);
                         }
                         else
                         {
                             // create the file
-                            File.WriteAllBytes(CurrentDir + "\\" + "Data.dat", data);
+    //                        File.WriteAllBytes(CurrentDir + "\\" + "Data.dat", data);
                             // now try and determine which file it is by examining the contents
                             TextFile textfile = ByteArrayToStructure<TextFile>(data);
                             TypeBinary typebinary = ByteArrayToStructure<TypeBinary>(data);
@@ -344,8 +344,8 @@ namespace ConvertToKicad
                                     modeldata = models.GetData();
                                     // uncompress the x.dat file to a .step file
                                     // step file is renamed to it's actual name later in the process
-                                    string Inflated = ZlibCodecDecompress(modeldata);
-                                    File.WriteAllText($"Models\\{i}.step", Inflated);
+                   //                 string Inflated = ZlibCodecDecompress(modeldata);
+                   //                 File.WriteAllText($"Models\\{i}.step", Inflated);
                                     i++;
                                 }
                             }

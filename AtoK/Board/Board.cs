@@ -437,24 +437,32 @@ namespace ConvertToKicad
                                         case "PLANE1": layer += "In1.Cu"; break;
                                         case "PLANE2": layer += "In2.Cu"; break;
                     */
-                    case "MULTILAYER": layer += "F.Cu F.Mask B.Cu B.Mask"; break;
-                    case "TOPOVERLAY": layer += "F.SilkS"; break;
+                    case "MULTILAYER":    layer += "F.Cu F.Mask B.Cu B.Mask"; break;
+                    case "TOPOVERLAY":    layer += "F.SilkS"; break;
                     case "BOTTOMOVERLAY": layer += "B.SilkS"; break;
-                    case "KEEPOUT": layer += "Margin"; break;
-                    case "MECHANICAL1": layer += "Edge.Cuts"; break;
-                    case "MECHANICAL3": layer += "Dwgs.User"; break;
-                    case "MECHANICAL13": return "Dwgs.User";
+                    case "KEEPOUT":       layer += "Margin"; break;
+                    case "MECHANICAL1":   layer += "Edge.Cuts"; break;
+                    case "MECHANICAL2":   layer += "Dwgs.User"; break;
+                    case "MECHANICAL3":   layer += "Dwgs.User"; break;
+                    case "MECHANICAL4":   layer += "Dwgs.User"; break;
+                    case "MECHANICAL5":   layer += "Dwgs.User"; break;
+                    case "MECHANICAL6":   layer += "Dwgs.User"; break;
+                    case "MECHANICAL7":   layer += "Dwgs.User"; break;
+                    case "MECHANICAL8":   layer += "Dwgs.User"; break;
+                    case "MECHANICAL9":   layer += "Dwgs.User"; break;
+                    case "MECHANICAL10":  layer += "Dwgs.User"; break;
+                    case "MECHANICAL11":  layer += "Eco1.User"; break;
+                    case "MECHANICAL12":  layer += "Dwgs.User"; break;
+                    case "MECHANICAL13":  return "Dwgs.User";
+                    case "MECHANICAL14": layer += "Dwgs.User"; break;
                     case "MECHANICAL15": layer += "F.CrtYd"; break;
                     case "MECHANICAL16": layer += "B.CrtYd"; break;
-                    case "MECHANICAL11": layer += "Eco1.User"; break;
-                    case "TOPSOLDER": layer += "F.Mask"; break;
+                    case "TOPSOLDER":    layer += "F.Mask"; break;
                     case "BOTTOMSOLDER": layer += "B.Mask"; break;
-                    case "MECHANICAL9": layer += "Dwgs.User"; break;
-                    case "MECHANICAL10": layer += "Dwgs.User"; break;
-                    case "BOTTOMPASTE": layer += "B.Paste"; break;
-                    case "TOPPASTE": layer += "F.Paste"; break;
+                    case "BOTTOMPASTE":  layer += "B.Paste"; break;
+                    case "TOPPASTE":     layer += "F.Paste"; break;
                     case "DRILLDRAWING": layer += "Dwgs.User"; break;
-                    case "DRILLGUIDE": layer += "Dwgs.User"; break;
+                    case "DRILLGUIDE":   layer += "Dwgs.User"; break;
                     default: return AltiumLayer;
                 }
                 return layer;
@@ -462,6 +470,8 @@ namespace ConvertToKicad
 
             public bool IsCopperLayer(Layers AltiumLayer)
             {
+                if (AltiumLayer == Layers.Multi_Layer)
+                    return true;
                 foreach (var Layer in OrderedLayers)
                 {
                     if ((Layers)Layer.Number == AltiumLayer)

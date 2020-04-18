@@ -18,10 +18,10 @@ namespace ConvertToKicad
         public static bool ConvertRunning = false;
         public const int Precision = 3; // after the decimal point precision i.e. 3 digits
         static string net_classes = "";
-        static string tracks = "";
+        static StringBuilder tracks;
         static UInt32 track_count = 0;
-        static string texts = "";
-        static string arcs = "";
+        static StringBuilder texts;
+        static StringBuilder arcs;
         static string fills = "";
         static string keepouts = "";
         public static bool ExtractFiles = false;
@@ -45,23 +45,19 @@ namespace ConvertToKicad
         static ObjectList<Dimension> DimensionsL;
         static ObjectList<Rule> RulesL;
         static ObjectList<Region> RegionsL;
-
+        static ObjectList<Line> Segments;
+        static Stopwatch StopWatch;
         static double originX = 0;
         static double originY = 0;
 
         static void CheckThreadAbort(Exception Ex)
         {
-            string text = Ex.ToString();
-            int index = text.IndexOf("line");
-            string line = text.Substring(index);
-            //            int index = 
-            //            int line = Convert.ToInt32(text.Substring(text.IndexOf("line")).Substring(0, text.Substring(text.IndexOf("line")).ToString().IndexOf("\r\n")).Replace("line ", ""));
             if (Ex.Message == "Thread was being aborted.")
             {
                 throw Ex;
             }
             else
-                OutputError(Ex.StackTrace); // OutputError(Ex.Message+$" at { line}");
+                OutputError($"{Ex.Message}"+Ex.StackTrace);
         }
 
         static void CheckThreadAbort(Exception Ex, string text)
@@ -376,7 +372,7 @@ namespace ConvertToKicad
                 return Name;
             // name is negated fully or in part
             // prepend ~ and another if negated chars end before end of string
-            string ret = "";
+            StringBuilder ret = new StringBuilder("");
             bool negating = false;
             for (var i = 0; i < Name.Length; i++)
             {
@@ -385,20 +381,20 @@ namespace ConvertToKicad
                     if (!negating)
                     {
                         negating = true;
-                        ret += '~';
+                        ret.Append('~');
                     }
-                    ret += Name[i];
+                    ret.Append(Name[i]);
                     i++;
                 }
                 else
                 {
                     if (negating)
                         negating = false;
-                    ret += '~';
-                    ret += Name[i];
+                    ret.Append('~');
+                    ret.Append(Name[i]);
                 }
             }
-            return ret;
+            return ret.ToString();
         }
 
         class Point2D
@@ -683,7 +679,7 @@ namespace ConvertToKicad
             {
                 if (!Program.ConsoleApp)
                     // show progress if GUI
-                    OutputString($"Processed {Processed} Objects in {watch.ElapsedMilliseconds} mS");
+                    OutputString($"Processed {Processed} Objects in {GetTimeString(watch.ElapsedMilliseconds)}");
             }
         }
 
@@ -713,7 +709,7 @@ namespace ConvertToKicad
 
             public override string ToString()
             {
-                string ret = "";
+                StringBuilder ret = new StringBuilder("");
                 try
                 {
                     for (var i = 0; i < base.Count; i++)
@@ -723,24 +719,24 @@ namespace ConvertToKicad
                         {
                             CurrentModule = i;
                         }
-                        ret += base[i].ToString();
+                        ret.Append(base[i].ToString());
                     }
                 }
                 catch (Exception Ex)
                 {
                     CheckThreadAbort(Ex);
                 }
-                return ret;
+                return ret.ToString();
             }
 
             public string ToString(double x, double y, double rotation)
             {
-                string ret = "";
+                StringBuilder ret = new StringBuilder("");
                 for (var i = 0; i < base.Count; i++)
                 {
-                    ret += base[i].ToString(x, y, rotation);
+                    ret.Append(base[i].ToString(x, y, rotation));
                 }
-                return ret;
+                return ret.ToString();
             }
         }
 
@@ -754,8 +750,14 @@ namespace ConvertToKicad
                 DirectoryInfo info = Directory.CreateDirectory(name);
                 if (!info.Exists)
                 {
-                    OutputError($@"failed to create directory ""{name}""");
-                    return false;
+                    // for some reason the create directory failed so try again
+                    info = Directory.CreateDirectory(name);
+                    Thread.Sleep(500); // TODO this is a frig sort out
+                    if (!Directory.Exists(name))
+                    {
+                        OutputError($@"failed to create directory ""{name}""");
+                        return false;
+                    }
                 }
             }
             return true;
@@ -883,7 +885,14 @@ namespace ConvertToKicad
 
                 foreach (FileInfo fi in dir.GetFiles())
                 {
-                    fi.Delete();
+                    try
+                    {
+                        fi.Delete();
+                    }
+                    catch(IOException Ex)
+                    {
+                        OutputError($"Couldn't delete {fi.Name}");
+                    }
                 }
 
                 foreach (DirectoryInfo di in dir.GetDirectories())
@@ -930,16 +939,26 @@ namespace ConvertToKicad
             }
         }
 
+        static public string GetTimeString(double time)
+        {
+            if (time > 1000)
+                return $"{time / 1000} S";
+            else
+                return $"{time} mS";
+        }
+
         public unsafe void ConvertFile(string FileName, bool extractFiles, bool createLib)
         {
             ConvertRunning = true;
             net_classes = "";
-            tracks = "";
-            texts = "";
-            arcs = "";
+            tracks = new StringBuilder("");
+            texts = new StringBuilder("");
+            arcs = new StringBuilder("");
             fills = "";
             keepouts = "";
+            StopWatch = new Stopwatch();
 
+            StopWatch.Start();
             try
             {
                 Brd            = new Board();
@@ -956,6 +975,7 @@ namespace ConvertToKicad
                 Mods           = new Models();
                 ShapeBasedMods = new ShapeBasedModels();
                 RegionsL       = new ObjectList<Region>();
+                Segments       = new ObjectList<Line>();
 
 
                 OutputString("Starting");
@@ -1037,7 +1057,7 @@ namespace ConvertToKicad
                 /* Not interested in the rest of these
                     , 
                     new AdvancedPlacerOptions    ("Advanced Placer Options6",     "90F01116977A40EF9F7CD92931AB45", "AdvancedPlacerOptions",    Type.text,   4), // not used
-                    new PinSwapOptions           ("Pin Swap Options6",            "", "PinSwapOptions",           Type.text,   4), // not used
+                    new PinSwapOptions           ("Pin Swap Options6",            "FF6E17E422A54417A1453ECEE2408E", "PinSwapOptions",           Type.text,   4), // not used
                     new DesignRuleCheckerOptions ("Design Rule Checker Options6", "0A342FA35A2D4FCDB8D2187D411EBC", "DesignRuleCheckerOptions", Type.text,   4), // not used
                     new EmbeddedFonts            ("EmbeddedFonts6",               "", "",                         Type.binary, 4),
                     new ShapeBasedRegions        ("ShapeBasedRegions6",           "", "",                         Type.mixed,  4),
@@ -1055,6 +1075,10 @@ namespace ConvertToKicad
                 Brd = (Board)PcbObjects[1];
 
                 CompoundFile cf = new CompoundFile(filename);
+                if (filename.Contains("CMPCBDoc"))
+                {
+//                    CMConvert(cf);
+                }
                 OutputString($"Converting {filename}");
                 string CM = (filename.Contains("CMPCBDoc")) ? "-CM" : "";
                 string UnpackDirectory = filename.Substring(0, filename.LastIndexOf('.')) + CM + "-Kicad";
@@ -1086,6 +1110,7 @@ namespace ConvertToKicad
                 // sort out the 3D models
                 if (Directory.Exists("Models"))
                 {
+                    StopWatch.Start();
                     Directory.SetCurrentDirectory("Models");
                     ProcessModelsFile("Data.dat");
                     if (!ExtractFiles)
@@ -1110,6 +1135,7 @@ namespace ConvertToKicad
                         // Models directory is empty so get rid
                         Directory.Delete("Models", true);
                     }
+                    OutputString($"3D models extracted in {GetTimeString(StopWatch.ElapsedMilliseconds)}");
                 }
                 if (!ExtractFiles)
                 {
@@ -1152,24 +1178,24 @@ namespace ConvertToKicad
                     OutFile.WriteLine("  (layers");
                     // output the layer stack
                     OutFile.WriteLine(Brd.ToString());
-                    OutFile.WriteLine("    (32 B.Adhes user)");
-                    OutFile.WriteLine("    (33 F.Adhes user)");
-                    OutFile.WriteLine("    (34 B.Paste user)");
-                    OutFile.WriteLine("    (35 F.Paste user)");
+                    OutFile.WriteLine("    (32 B.Adhes user hide)");
+                    OutFile.WriteLine("    (33 F.Adhes user hide)");
+                    OutFile.WriteLine("    (34 B.Paste user hide)");
+                    OutFile.WriteLine("    (35 F.Paste user hide)");
                     OutFile.WriteLine("    (36 B.SilkS user)");
                     OutFile.WriteLine("    (37 F.SilkS user)");
-                    OutFile.WriteLine("    (38 B.Mask user)");
-                    OutFile.WriteLine("    (39 F.Mask user)");
-                    OutFile.WriteLine("    (40 Dwgs.User user)");
-                    OutFile.WriteLine("    (41 Cmts.User user)");
-                    OutFile.WriteLine("    (42 Eco1.User user)");
-                    OutFile.WriteLine("    (43 Eco2.User user)");
+                    OutFile.WriteLine("    (38 B.Mask user hide)");
+                    OutFile.WriteLine("    (39 F.Mask user hide)");
+                    OutFile.WriteLine("    (40 Dwgs.User user hide)");
+                    OutFile.WriteLine("    (41 Cmts.User user hide)");
+                    OutFile.WriteLine("    (42 Eco1.User user hide)");
+                    OutFile.WriteLine("    (43 Eco2.User user hide)");
                     OutFile.WriteLine("    (44 Edge.Cuts user)");
                     OutFile.WriteLine("    (45 Margin user)");
-                    OutFile.WriteLine("    (46 B.CrtYd user)");
-                    OutFile.WriteLine("    (47 F.CrtYd user)");
-                    OutFile.WriteLine("    (48 B.Fab user)");
-                    OutFile.WriteLine("    (49 F.Fab user)");
+                    OutFile.WriteLine("    (46 B.CrtYd user hide)");
+                    OutFile.WriteLine("    (47 F.CrtYd user hide)");
+                    OutFile.WriteLine("    (48 B.Fab user hide)");
+                    OutFile.WriteLine("    (49 F.Fab user hide)");
                     OutFile.WriteLine("");
                     OutFile.WriteLine("  )");
                     OutFile.WriteLine("");
@@ -1236,9 +1262,9 @@ namespace ConvertToKicad
                 //            PadsL.ToString(); N.B. KiCad doesn't allow free standing pads yet ...TODO create modules to do this
                 OutFile.WriteLine(PolygonsL.ToString());
                 OutFile.WriteLine(ViasL.ToString());
-                OutFile.WriteLine(tracks);
-                OutFile.WriteLine(arcs);
-                OutFile.WriteLine(texts);
+                OutFile.WriteLine(tracks.ToString());
+                OutFile.WriteLine(arcs.ToString());
+                OutFile.WriteLine(texts.ToString());
                 OutFile.WriteLine(fills);
                 OutFile.WriteLine(keepouts);
                 OutFile.WriteLine(DimensionsL.ToString());
@@ -1316,7 +1342,7 @@ namespace ConvertToKicad
                 }
                 cf.Close();
                 Directory.SetCurrentDirectory("..\\");
-                OutputString("Finished");
+                OutputString($"Finished time taken = {GetTimeString(StopWatch.ElapsedMilliseconds)}");
             }
             catch (ThreadAbortException abortException)
             {

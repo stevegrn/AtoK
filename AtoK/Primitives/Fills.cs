@@ -93,28 +93,27 @@ namespace ConvertToKicad
                     // Use the memory stream in a binary reader.
                     using (BinaryReader br = new BinaryReader(ms))
                     {
-                        ms.Seek(0 + 5, SeekOrigin.Begin);
+                        ms.Seek(0, SeekOrigin.Begin);
                         Layer = (Layers)br.ReadByte(); // line offset 0
                         Locked = br.ReadByte();        // line offset 1
                         Keepout = (int)br.ReadByte();  // line offset 2
 
-                        ms.Seek(3 + 5, SeekOrigin.Begin);
+                        ms.Seek(3 , SeekOrigin.Begin);
                         Net = br.ReadInt16();
                         Net += 1;
                         NetName = $"\"{NetsL[Net].Name}\"";
-                        ms.Seek(7 + 5, SeekOrigin.Begin);
+                        ms.Seek(7, SeekOrigin.Begin);
                         Component = br.ReadInt16();
-                        if (Component != -1)
-                            InComponent = true;
-                        ms.Seek(13 + 5, SeekOrigin.Begin);
+                        InComponent = (Component != -1);
+                        ms.Seek(13, SeekOrigin.Begin);
                         X1 = Math.Round(Bytes2mm(br.ReadBytes(4)) - originX, Precision);
-                        ms.Seek(17 + 5, SeekOrigin.Begin);
+                        ms.Seek(17, SeekOrigin.Begin);
                         Y1 = Math.Round(Bytes2mm(br.ReadBytes(4)) - originY, Precision);
-                        ms.Seek(21 + 5, SeekOrigin.Begin);
+                        ms.Seek(21, SeekOrigin.Begin);
                         X2 = Math.Round(Bytes2mm(br.ReadBytes(4)) - originX, Precision);
-                        ms.Seek(25 + 5, SeekOrigin.Begin);
+                        ms.Seek(25, SeekOrigin.Begin);
                         Y2 = Math.Round(Bytes2mm(br.ReadBytes(4)) - originY, Precision);
-                        ms.Seek(29 + 5, SeekOrigin.Begin);
+                        ms.Seek(29, SeekOrigin.Begin);
                         Rotation = br.ReadDouble();
                     }
                     if (Keepout == 2)
@@ -125,9 +124,19 @@ namespace ConvertToKicad
                         if (InComponent)
                         {
                             // need to factor in component's rotation
-                            double rot = ModulesL[Component].Rotation;
-                            p1 = p1.Rotate(c, rot);
-                            p2 = p2.Rotate(c, rot);
+                            if (Component < ModulesL.Count)
+                            {
+                                try
+                                {
+                                    double rot = ModulesL[Component].Rotation;
+                                    p1 = p1.Rotate(c, rot);
+                                    p2 = p2.Rotate(c, rot);
+                                }
+                                catch (Exception Ex)
+                                {
+                                    CheckThreadAbort(Ex);
+                                }
+                            }
                         }
                         string layer = "";
                         if (Layer == Layers.Keepout_Layer)
@@ -159,13 +168,46 @@ $@"
                     else
                     {
                         Fill Fill = new Fill(X1, Y1, X2, Y2, Brd.GetLayer(Layer), GetNetName(Net));
-                        if (Component < ModulesL.Count)
+                        if (Component < ModulesL.Count && Component != -1)
                             ModulesL[Component].Fills.Add(Fill);
                     }
                     return true;
                 }
             }
 
+
+            public override bool ProcessBinaryFile(byte[] data)
+            {
+                StartTimer();
+                if (Binary_size == 0)
+                    return false;
+
+                try
+                {
+                    using (MemoryStream ms = new MemoryStream(data))
+                    {
+                        uint size = (uint)ms.Length;
+                        long p = 0;
+
+                        BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
+                        // find the headers and process
+                        while (p < size)
+                        {
+                            ms.Seek(p + 1, SeekOrigin.Begin);
+                            UInt32 RecordLength = br.ReadUInt32();
+                            // we are now pointing at a Fill record
+                            byte[] record = br.ReadBytes((int)RecordLength);
+                            p = ms.Position;
+                            ProcessLine(record);
+                        }
+                    }
+                }
+                catch (Exception Ex)
+                {
+                    CheckThreadAbort(Ex);
+                }
+                return true;
+            }
         }
     }
 }

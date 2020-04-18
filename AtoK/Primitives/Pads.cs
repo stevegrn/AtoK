@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Diagnostics;
 
 
 namespace ConvertToKicad
@@ -137,22 +138,22 @@ namespace ConvertToKicad
                     hole = "";
 
                 // make octagonal pad out of polygon
-                string
-                ret = $"    (pad {Number} {Type} custom (at {X} {Y}  {Rotation}) (size {PadSizeX} {PadSizeY}) {hole} (layers {Layer})\n";
-                ret += $"      (net {Net} {Net_name}) (zone_connect {Zone_connect})";
-                ret += $"      (zone_connect {Zone_connect})\n"; // 0=none 1=thermal 2=solid get from rules
-                ret += $"      (options (clearance outline) (anchor rect))\n";
-                ret += $"      (primitives\n";
-                ret += $"         (gr_poly (pts\n";
-                ret += $"         (xy {Points[0].X} {-Points[0].Y})\n";
-                ret += $"         (xy {Points[1].X} {-Points[1].Y})\n";
-                ret += $"         (xy {Points[2].X} {-Points[2].Y})\n";
-                ret += $"         (xy {Points[3].X} {-Points[3].Y})\n";
-                ret += $"         (xy {Points[4].X} {-Points[4].Y})\n";
-                ret += $"         (xy {Points[5].X} {-Points[5].Y})\n";
-                ret += $"         (xy {Points[6].X} {-Points[6].Y})\n";
-                ret += $"         (xy {Points[7].X} {-Points[7].Y})\n      )))\n    )\n";
-                return ret;
+                StringBuilder ret = new StringBuilder("");
+                ret.Append($"    (pad {Number} {Type} custom (at {X} {Y}  {Rotation}) (size {PadSizeX} {PadSizeY}) {hole} (layers {Layer})\n");
+                ret.Append($"      (net {Net} {Net_name}) (zone_connect {Zone_connect})");
+                ret.Append($"      (zone_connect {Zone_connect})\n"); // 0=none 1=thermal 2=solid get from rules
+                ret.Append($"      (options (clearance outline) (anchor rect))\n");
+                ret.Append($"      (primitives\n");
+                ret.Append($"         (gr_poly (pts\n");
+                ret.Append($"         (xy {Points[0].X} {-Points[0].Y})\n");
+                ret.Append($"         (xy {Points[1].X} {-Points[1].Y})\n");
+                ret.Append($"         (xy {Points[2].X} {-Points[2].Y})\n");
+                ret.Append($"         (xy {Points[3].X} {-Points[3].Y})\n");
+                ret.Append($"         (xy {Points[4].X} {-Points[4].Y})\n");
+                ret.Append($"         (xy {Points[5].X} {-Points[5].Y})\n");
+                ret.Append($"         (xy {Points[6].X} {-Points[6].Y})\n");
+                ret.Append($"         (xy {Points[7].X} {-Points[7].Y})\n      )))\n    )\n");
+                return ret.ToString();
             }
 
             public string ToString(double x, double y)
@@ -162,7 +163,7 @@ namespace ConvertToKicad
                 if (Shape == "roundrect")
                 {
                     return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
+                           $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
                 }
                 else
                 if (Shape == "octagonal")
@@ -173,7 +174,7 @@ namespace ConvertToKicad
                 else
                 {
                     return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
+                           $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
                 }
             }
 
@@ -187,7 +188,7 @@ namespace ConvertToKicad
                 if (Shape == "roundrect")
                 {
                     return $"    (pad {Number} {Type} {Shape} (at {Math.Round(p.X, Precision)} {-Math.Round(p.Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
+                           $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
                 }
                 if (Shape == "octagonal")
                 {
@@ -197,7 +198,7 @@ namespace ConvertToKicad
                 else
                 {
                     return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                        $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
+                           $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
                 }
             }
 
@@ -211,7 +212,7 @@ namespace ConvertToKicad
                 if (Shape != "octagonal")
                 {
                     return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation + ModuleRotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                        $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
+                           $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
                 }
                 else
                 {
@@ -228,7 +229,8 @@ namespace ConvertToKicad
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
             unsafe struct PadStruct
             {
-                public fixed byte U0[23];       //  0  23 ???
+                public fixed byte U0[19];       //  0  19 ???
+                public int Offset;              //  19 4 offset to pad layer info add 559 get start of layer0 shape
                 public byte Layer;              //  23 1 layer
                 public short U1;                //  24 2 Flags
                                                 //       bit 4 0=locked
@@ -274,10 +276,11 @@ namespace ConvertToKicad
                 public int HoleRotation;        // 129 4 hole rotation
                 public short JumperID;          // 133 2 jumper ID
                 public fixed byte U12[6];       // 135 6 ???
+
                 public fixed int MidLayerXSize[29]; // 141 29*4 Midlayers 2-30
                 public fixed int MidLayerYSixe[29]; // 257 29*4 MidLayers 2-30
                 public fixed byte U13[29];          // 373 29*1 Midlayers 2-30 unknown
-                public fixed byte U14[673 - 402];   // 402
+                public fixed byte U14[673 - 402];   // 402 271
                 public fixed byte PadShapes[32];    // 673 Padshapes on 32 layers top bottom and 30 inner layers
                 public fixed byte RRatios[32];      // 705 RRatios for top, middle 30, and bottom layers
                 public fixed byte U15[32];          // 743 ???
@@ -285,64 +288,22 @@ namespace ConvertToKicad
                 public fixed byte U17[1];           // 738 ???
             }
 
-            // After Winter 09 pad structure slightly different...grrr
+            // pad layer info position in pad record = Offset in previous structure
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
-            unsafe struct PadStructPost09
+            unsafe struct PadLayers
             {
-                public fixed byte U0[23];       //  0  23 ???
-                public byte Layer;              //  23 1 layer
-                public short U1;                //  24 2 Flags
-                                                //       bit 4 0=locked
-                                                //       bit 5 force tenting on top
-                                                //       bit 6 force tenting on bottom
-                                                //       bit 7 Test point top
-                                                //       bit 8 Test point bottom
-                public short Net;               //  26 2 net
-                public short U2;                //  28 2 ??
-                public short Component;         //  30 2 component
-                public short U3;                //  32 2 ??
-                public short U4;                //  34 2 ??
-                public int X;                   //  36 4 X
-                public int Y;                   //  40 4 Y
-                public int XSize;               //  44 4 XSize
-                public int YSize;               //  48 4 YSize
-                public int MidXSize;            //  52 4 mid X size
-                public int MidYSize;            //  56 4 mid Y size
-                public int BotXSize;            //  60 4 bottom X size
-                public int BotYSize;            //  64 4 bottom Y size
-                public int HoleSize;            //  68 4 holesize
-                public byte TopShape;           //  72 1 top shape
-                public byte MidShape;           //  73 1 middle shape
-                public byte BotShape;           //  74 1 bottom shape
-                public double Rotation;         //  75 8 rotation
-                public byte Plated;             //  83 1 plated
-                public byte U7;                 //  84 1 ???
-                public byte PadMode;            //  85 1 PadMode
-                public fixed byte U8[5];        //  86 5 ???
-                public int CCW;                 //  91 4 CCW
-                public byte CEN;                //  95 1 CEN
-                public byte U9;                 //  96 1 ???
-                public int CAG;                 //  97 4 CAG
-                public int CPR;                 // 101 4 CPR
-                public int CPC;                 // 105 4 CPC
-                public int PasteMaskExpansion;  // 109 4 paste mask expansion  (CPE)
-                public int SolderMaskExpansion; // 113 4 solder mask expansion (CSE)
-                public byte CPL;                // 117 1 CPL
-                public fixed byte U10[6];       // 118 6 ???
-                public byte UsePasteMaskRules;  // 124 1 use paste expansion rules (CPEV)
-                public byte UseSolderMaskRules; // 125 1 use solder mask expansion rules (CSEV)
-                public fixed byte U11[3];       // 126 7 ??? 
-                public int HoleRotation;        // 129 4 hole rotation
-                public short JumperID;          // 133 2 jumper ID
-                public fixed byte U12[6];       // 135 6 ???
-                public fixed int MidLayerXSize[29]; // 141 29*4 Midlayers 2-30
-                public fixed int MidLayerYSixe[29]; // 257 29*4 MidLayers 2-30
-                public fixed byte U13[679 - 373];   // 373
-                public fixed byte PadShapes[32];    // 679 Padshapes on 32 layers top bottom and 30 inner layers
-                public fixed byte RRatios[32];      // 712 RRatios for top, middle 30, and bottom layers 711 for after winter09
-                public fixed byte U14[32];          // 743 ???
-                public fixed byte U15[1];           // 775 ???
-                public fixed byte U16[1];           // 776 ???
+                public fixed byte U0[27];            // not known yet
+                public fixed int  MidLayerXSize[29]; //  27 29*4 Midlayers 2-30
+                public fixed int  MidLayerYSixe[29]; // 143 29*4 MidLayers 2-30
+                public fixed byte U13[29];           // 259 29*1 Midlayers 2-30 unknown
+                public fixed byte U14[1];            // 288 ???
+                public fixed byte HoleShape[1];      // 289 Hole shape 0=Round 1 = Square 2 = slot
+                public fixed byte U15[559 - 290];    // 290 269
+                public fixed byte PadShapes[32];     // 559 Padshapes on 32 layers top bottom and 30 inner layers
+                public fixed byte RRatios[32];       // 591 RRatios for top, middle 30, and bottom layers
+                public fixed byte U16[32];           // 650 ???
+                public fixed byte U17[1];            // 665 ???
+                public fixed byte U18[1];            // 666 ???
             }
 
             // just to be awkward records not same size varies with name of pad
@@ -360,13 +321,17 @@ namespace ConvertToKicad
 
             public override bool ProcessBinaryFile(byte[] data)
             {
+                bool GenerateTxtFile = true;
+                FileStream TextFile = null;
                 StartTimer();
                 if (Binary_size == 0)
                     return false;
 
-                FileStream TextFile = null;
-                if (ExtractFiles)
-                    TextFile = File.Open("Data.txt", FileMode.OpenOrCreate);
+                if (GenerateTxtFile)
+                {
+                    if (ExtractFiles)
+                        TextFile = File.Open("Data.txt", FileMode.OpenOrCreate);
+                }
                 try
                 {
                     using (MemoryStream ms = new MemoryStream(data))
@@ -379,6 +344,8 @@ namespace ConvertToKicad
                         List<UInt32> Starts = new List<UInt32>();
                         // look for record starts
                         {
+                            Stopwatch timer = new Stopwatch();
+                            timer.Start();
                             // signature is
                             // byte 02
                             // int32 length
@@ -450,20 +417,25 @@ namespace ConvertToKicad
                                     Longest = len;
                             }
                             index = -1;
-                            string Header1 = "Pos                 ";
-                            for (int i = 0; i < Longest; i++)
-                                Header1 += $"{(i / 100),-3:D2}";
-                            string Header2 = "                    ";
-                            for (int i = 0; i < Longest; i++)
-                                Header2 += $"{(i % 100),-3:D2}";
-                            string Header3 = "--------------------";
-                            for (int i = 0; i < Longest; i++)
-                                Header3 += $"---";
-                            if (ExtractFiles)
+                            if (GenerateTxtFile)
                             {
-                                AddText(TextFile, Header1 + "\n");
-                                AddText(TextFile, Header2 + "\n");
-                                AddText(TextFile, Header3 + "\n");
+                                AddText(TextFile, $"Altium Version {VersionString}\n");
+                                // generate headers for .txt file
+                                string Header1 = "Pos                 ";
+                                for (int i = 0; i < Longest; i++)
+                                    Header1 += $"{(i / 100),-3:D2}";
+                                string Header2 = "                    ";
+                                for (int i = 0; i < Longest; i++)
+                                    Header2 += $"{(i % 100),-3:D2}";
+                                string Header3 = "--------------------";
+                                for (int i = 0; i < Longest; i++)
+                                    Header3 += $"---";
+                                if (ExtractFiles)
+                                {
+                                    AddText(TextFile, Header1 + "\n");
+                                    AddText(TextFile, Header2 + "\n");
+                                    AddText(TextFile, Header3 + "\n");
+                                }
                             }
                             foreach (var p in Starts)
                             {
@@ -505,24 +477,30 @@ namespace ConvertToKicad
                                 Int16 JumperID;
                                 byte[] bytes = br.ReadBytes((int)len - 6); // get record after header stuff
 
-                                if (p == 0)
-                                    r = bytes; // get reference bytes
-                                string text = "";
-                                int count = 0;
-                                int CompareLimit = Math.Min(r.Length, bytes.Length);
-                                foreach (var c in bytes)
+                                if (GenerateTxtFile)
                                 {
-                                    if (count < CompareLimit && r[count] != bytes[count])
-                                        text += $"|{c:X2}";
-                                    else
-                                        text += $" {c:X2}";
-                                    count++;
+                                    if (p == 0)
+                                        r = bytes; // get reference bytes
+                                    StringBuilder text = new StringBuilder("");
+                                    int count = 0;
+                                    int CompareLimit = Math.Min(r.Length, bytes.Length);
+                                    foreach (var c in bytes)
+                                    {
+                                        if (count < CompareLimit && r[count] != bytes[count])
+                                            text.Append($"|{c:X2}");
+                                        else
+                                            text.Append($" {c:X2}");
+                                        count++;
+                                    }
+                                    if (ExtractFiles)
+                                        AddText(TextFile, $"{pos:X8} " + $"{len - name.Length,4} {name,4} {text.ToString()}\n");
                                 }
-                                if (ExtractFiles)
-                                    AddText(TextFile, $"{pos:X8} " + $"{len,4} {name,4} " + text + "\n");
-
                                 PadStruct pad = ByteArrayToStructure<PadStruct>(bytes);
-                                PadStructPost09 padPost09 = ByteArrayToStructure<PadStructPost09>(bytes);
+                                ms.Seek(pos + pad.Offset, SeekOrigin.Begin);
+                                int LayersSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(PadLayers));
+
+                                byte[] layerbytes = br.ReadBytes(LayersSize); // get layers data
+                                PadLayers PadLayers = ByteArrayToStructure<PadLayers>(layerbytes);
                                 Layer = (Layers)pad.Layer;
                                 Net = pad.Net;
                                 Net++;
@@ -535,21 +513,24 @@ namespace ConvertToKicad
                                 XSize = ToMM(pad.XSize);
                                 YSize = ToMM(pad.YSize);
                                 HoleSize = ToMM(pad.HoleSize);
-                                shape = pad.TopShape;
-                                if (shape == 1 && len > 160)
+                                unsafe
                                 {
-                                    int offset = (int)Marshal.OffsetOf(typeof(PadStruct), "PadShapes");
-                                    if (len >= offset)
+                                    shape = pad.TopShape;
+                                    if (len > 160 && shape == 1) // TODO this can't be right
                                     {
-                                        unsafe
-                                        {
-                                            if (!Post09)
-                                                shape = pad.PadShapes[0];
-                                            else
-                                                shape = padPost09.PadShapes[0];
-                                        }
+                                        shape = PadLayers.PadShapes[0];
+                                        RRatio = (double)PadLayers.RRatios[0] / 200;
+                                    }
+                                    else
+                                    {
+                                        RRatio = 0;
                                     }
                                 }
+                                if (shape > 5)
+                                    shape = 5;
+                                string[] shapes = { "circle", "circle", "rect", "octagonal", "oval", "roundrect" };
+                                if (shapes[shape] == "circle" && XSize != YSize)
+                                    shape = 4; // oval pad
                                 Rotation = pad.Rotation;
                                 plated = pad.Plated != 0;
                                 PasteMaskExpansion = ToMM(pad.PasteMaskExpansion);
@@ -557,22 +538,8 @@ namespace ConvertToKicad
                                 UsePasteMaskRules = pad.UsePasteMaskRules;
                                 UseSolderMaskRules = pad.UseSolderMaskRules;
                                 JumperID = pad.JumperID;
-                                RRatio = 0;
-                                if (len > 709)
-                                    unsafe
-                                    {
-                                        if(!Post09)
-                                            RRatio = (double)pad.RRatios[0] / 200;
-                                        else
-                                            RRatio = (double)padPost09.RRatios[0] / 200;
-                                    }
                                 bool InComponent = Component != -1;
 
-                                if (shape == 9)
-                                    shape = 5;
-                                string[] shapes = { "circle", "circle", "rect", "octagonal", "oval", "roundrect" };
-                                if (shapes[shape] == "circle" && XSize != YSize)
-                                    shape = 4; // oval pad
                                 string type;
                                 if (Layer == Layers.Multi_Layer)
                                 {
@@ -591,6 +558,8 @@ namespace ConvertToKicad
                                 else
                                     type = "smd";
                                 string layer = Brd.GetLayer(Layer);
+                                if (!Brd.IsCopperLayer(Layer))
+                                    return false; 
                                 if (layer == "Margin") // TODO sort this keepout layer malarky
                                     layer = "Dwgs.User";
                                 if (type == "smd")
@@ -603,9 +572,9 @@ namespace ConvertToKicad
                                     XSize = YSize = HoleSize;
                                 }
 
+                                Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net, RRatio);
                                 if (!InComponent)
                                 {
-                                    Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net, RRatio);
                                     PadsL.Add(Pad);
                                     // free pads not allowed (at present) in PcbNew so generate a single pad module
                                     Module M = new Module($"FreePad{ModulesL.Count}", X, Y, XSize, YSize, Pad);
@@ -614,7 +583,6 @@ namespace ConvertToKicad
                                 }
                                 else
                                 {
-                                    Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net, RRatio);
                                     try
                                     {
                                         ModulesL[Component].Pads.Add(Pad);
@@ -630,7 +598,8 @@ namespace ConvertToKicad
                         {
                             CheckThreadAbort(Ex);
                         }
-                        TextFile.Close();
+                        if(GenerateTxtFile)
+                            TextFile.Close();
                     }
                 }
                 catch (Exception Ex)

@@ -29,37 +29,43 @@ namespace ConvertToKicad
 
             public ComponentBody(string line)
             {
-                string Ident = GetString(line, "IDENTIFIER");
-                if (Ident != "")
+                string Ident = GetString(line, "IDENTIFIER=");
+                try
                 {
-                    Ident = Ident.Substring(1, Ident.Length - 1);
-                    string[] chars = Ident.Split(',');
-                    foreach (string c in chars)
+                    if (Ident != "")
                     {
-                        Int32 x = Convert.ToInt32(c);
-                        Identifier += Convert.ToChar(x);
+                        Ident = Ident.Substring(1, Ident.Length - 1);
+                        string[] chars = Ident.Split(',');
+                        foreach (string c in chars)
+                        {
+                            Int32 x = Convert.ToInt32(c);
+                            Identifier += Convert.ToChar(x);
+                        }
                     }
+                    else
+                        Identifier = "";
+                    ID = GetString(line, "MODELID=");
+                    Checksum = GetUInt32(GetString(line, "MODEL.CHECKSUM="));
+                    StandoffHeight = GetNumberInMM(GetString(line, "MODEL.3D.DZ="));
+                    OverallHeight = GetNumberInMM(GetString(line, "OVERALLHEIGHT="));
+                    X = Math.Round(GetNumberInMM(GetString(line, "MODEL.2D.X=")) - originX, Precision);
+                    Y = Math.Round(GetNumberInMM(GetString(line, "MODEL.2D.Y=")) - originY, Precision);
+                    Model2dRot = GetDouble(GetString(line, "MODEL.2D.ROTATION="));   // rotation of footprint
+                    Model3dRotX = GetDouble(GetString(line, "MODEL.3D.ROTX="));       // rotation about x for 3d model
+                    Model3dRotY = GetDouble(GetString(line, "MODEL.3D.ROTY="));       // rotation about y for 3d model
+                    Model3dRotZ = GetDouble(GetString(line, "MODEL.3D.ROTZ="));       // rotation about z for 3d model
+                    TextureRotation = GetDouble(GetString(line, "TEXTUREROTATION="));     // yet another rotation
+                    BodyLayer = GetString(line, "BODYPROJECTION=");
                 }
-                else
-                    Identifier = "";
-                ID = GetString(line, "MODELID=");
-                Checksum = GetUInt32(GetString(line, "MODEL.CHECKSUM="));
-                StandoffHeight = GetNumberInMM(GetString(line, "MODEL.3D.DZ="));
-                OverallHeight = GetNumberInMM(GetString(line, "OVERALLHEIGHT="));
-                X = Math.Round(GetNumberInMM(GetString(line, "MODEL.2D.X=")) - originX, Precision);
-                Y = Math.Round(GetNumberInMM(GetString(line, "MODEL.2D.Y=")) - originY, Precision);
-                Model2dRot = GetDouble(GetString(line, "MODEL.2D.ROTATION="));   // rotation of footprint
-                Model3dRotX = GetDouble(GetString(line, "MODEL.3D.ROTX="));       // rotation about x for 3d model
-                Model3dRotY = GetDouble(GetString(line, "MODEL.3D.ROTY="));       // rotation about y for 3d model
-                Model3dRotZ = GetDouble(GetString(line, "MODEL.3D.ROTZ="));       // rotation about z for 3d model
-                TextureRotation = GetDouble(GetString(line, "TEXTUREROTATION="));     // yet another rotation
-                BodyLayer = GetString(line, "BODYPROJECTION=");
+                catch(Exception Ex)
+                {
+                    CheckThreadAbort(Ex);
+                }
             }
 
             public override string ToString(double x, double y, double modulerotation)
             {
                 string FileName = Mods.GetFilename(ID).ToLower();
-                string ret = "";
 
                 Point2D p = new Point2D(X - x, Y - y);
                 Model2dRot = Model2dRot % 360;
@@ -86,11 +92,10 @@ namespace ConvertToKicad
                         Model3dRotY = Model3dRotY - 180;
                     }
 
-                    ret += $"    (model \"$(KIPRJMOD)/Models/{FileName}\"\n";
-                    ret += $"        (offset (xyz {p.X} {p.Y} {StandoffHeight}))\n";
-                    ret += $"        (scale (xyz {1} {1} {1}))\n";
-                    ret += $"        (rotate (xyz {-Model3dRotX} {-Model3dRotY} {-ModRotZ}))\n    )\n";
-                    return ret;
+                    return $"    (model \"$(KIPRJMOD)/Models/{FileName}\"\n"
+                         + $"        (offset (xyz {p.X} {p.Y} {StandoffHeight}))\n"
+                         + $"        (scale (xyz {1} {1} {1}))\n"
+                         + $"        (rotate (xyz {-Model3dRotX} {-Model3dRotY} {-ModRotZ}))\n    )\n";
                 }
 
                 return $"# ID={ID} Checksum = {Checksum} StandoffHeight={StandoffHeight} OverallHeight={OverallHeight} x={X - x} y={-(Y - y)} rotx={Model3dRotX} roty={Model3dRotY} rotz={Model3dRotZ}\n";

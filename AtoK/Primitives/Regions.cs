@@ -17,6 +17,9 @@ namespace ConvertToKicad
             string Layer { get; set; }
             bool InComponent { get; set; }
             public bool Keepout { get; set; }
+            public bool PolygonCutout { get; set; }
+            public bool BoardCutout { get; set; }
+            short Flags { get; set; }
 
             public void AddPoint(double X, double Y)
             {
@@ -29,18 +32,23 @@ namespace ConvertToKicad
 
             }
 
-            public Region(string layer, int net, bool keepout)
+            public Region(string layer, int net, Int16 flags)
             {
                 Layer = layer;
                 Net_no = net;
                 Net_name = GetNetName(Net_no);
                 Points = new List<Point>();
-                Keepout = keepout;
+                Flags = flags;
+                bool Keepout       = (Flags & 0x200) == 0x200;
+                bool PolygonCutout = (Flags & 4) == 4;
+                bool BoardCutout   = (Flags & 1) == 1;
+                if (BoardCutout)
+                    Layer = "Edge.Cuts";
             }
 
             public override string ToString()
             {
-                string ret = "";
+                StringBuilder ret = new StringBuilder("");
                 string connectstyle = "";
 
                 double clearance = GetRuleValue("Clearance", "PolygonClearance");
@@ -54,24 +62,26 @@ namespace ConvertToKicad
                 //            Layer = "Dwgs.User";
                 if (Layer != "Edge.Cuts")
                 {
-                    ret = $"  (zone (net {Net_no}) (net_name {Net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)";
-                    ret += $"    (priority 100)\n";
-                    ret += $"    (connect_pads {connectstyle} (clearance {clearance}))\n"; // TODO sort out these numbers properly
-                    ret += $"    (min_thickness 0.2)\n";
+                    ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)");
+                    ret.Append($"    (priority 100)\n");
+                    ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
+                    ret.Append($"    (min_thickness 0.2)\n");
                     if (Keepout)
-                        ret += "(keepout(copperpour not_allowed))\n";
+                        ret.Append("(keepout(copperpour not_allowed))\n");
+                    else if (PolygonCutout)
+                        ret.Append("(keepout (tracks not_allowed) (vias allowed) (copperpour not_allowed))");
                     string fill = (Layer == "Edge.Cuts") ? "no" : "yes";
-                    ret += $"    (fill {fill} (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n";
+                    ret.Append($"    (fill {fill} (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n");
                     var i = 0;
-                    ret += "    (polygon (pts\n        ";
+                    ret.Append("    (polygon (pts\n        ");
                     foreach (var Point in Points)
                     {
                         i++;
                         if ((i % 5) == 0)
-                            ret += "\n        ";
-                        ret += Point.ToString();
+                            ret.Append("\n        ");
+                        ret.Append(Point.ToString());
                     }
-                    ret += "\n      )\n    )\n  )\n";
+                    ret.Append("\n      )\n    )\n  )\n");
                 }
                 else
                 {
@@ -80,18 +90,20 @@ namespace ConvertToKicad
                     int i;
                     for (i = 0; i < Points.Count - 1; i++)
                     {
-                        ret += $"  (gr_line (start {Points[i].X} {-Points[i].Y}) (end {Points[i + 1].X} {-Points[i + 1].Y}) (layer Edge.Cuts) (width 0.1))\n";
+                        ret.Append($"  (gr_line (start {Points[i].X} {-Points[i].Y}) (end {Points[i + 1].X} {-Points[i + 1].Y}) (layer Edge.Cuts) (width 0.1))\n");
                     }
-                    ret += $"  (gr_line (start {Points[i].X} {-Points[i].Y}) (end {Start.X} {-Start.Y}) (layer Edge.Cuts) (width 0.1))\n";
+                    ret.Append($"  (gr_line (start {Points[i].X} {-Points[i].Y}) (end {Start.X} {-Start.Y}) (layer Edge.Cuts) (width 0.1))\n");
                 }
-                return ret;
+                return ret.ToString();
             }
 
             // inside component region
             // presently this is not allowed (V5.1.2)
             public override string ToString(double x, double y, double ModuleRotation)
             {
-                string ret = "";
+                // not allowed so just return
+                return "";
+                StringBuilder ret = new StringBuilder("");
 
                 double clearance = GetRuleValue("Clearance", "PolygonClearance");
                 if (Layer.Substring(0, 2) == "In")
@@ -100,27 +112,47 @@ namespace ConvertToKicad
                     clearance = GetRuleValue("PlaneClearance", "PlaneClearance");
                 }
 
-                /*
-                    string connectstyle = ""; // TODO get connect style from rules
-                    ret = $"  (zone (net {net_no}) (net_name {net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)";
-                    ret += $"    (priority 100)\n";
-                    ret += $"    (connect_pads {connectstyle} (clearance {clearance}))\n"; // TODO sort out these numbers properly
-                    ret += $"    (min_thickness 0.2)\n";
-                    ret += "    (fill yes (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n";
-                 */
+                string connectstyle = ""; // TODO get connect style from rules
+                ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)");
+                ret.Append($"    (priority 100)\n");
+                ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
+                ret.Append($"    (min_thickness 0.2)\n");
+                if (Keepout)
+                    ret.Append("(keepout(copperpour not_allowed))\n");
+                else if (PolygonCutout)
+                    ret.Append("(keepout (tracks not_allowed) (vias allowed) (copperpour not_allowed))");
+                string fill = (Layer == "Edge.Cuts") ? "no" : "yes";
+                ret.Append($"    (fill {fill} (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n");
                 var i = 0;
-                ret += "    (fp_poly (pts\n        ";
+                ret.Append("    (polygon (pts\n        ");
                 foreach (var Point in Points)
                 {
                     i++;
                     if ((i % 5) == 0)
-                        ret += "\n        ";
-                    ret += Point.ToString(x, y, ModuleRotation);
+                        ret.Append("\n        ");
+                    ret.Append(Point.ToString());
+                }
+                ret.Append("\n      )\n    )\n  )\n");
+                
+/*                ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)");
+                ret.Append($"    (priority 100)\n");
+                ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
+                ret.Append($"    (min_thickness 0.2)\n");
+                ret.Append("    (fill yes (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n");
+                 
+                var i = 0;
+                ret.Append("    (fp_poly (pts\n        ");
+                foreach (var Point in Points)
+                {
+                    i++;
+                    if ((i % 5) == 0)
+                        ret.Append("\n        ");
+                    ret.Append(Point.ToString(x, y, ModuleRotation));
                 }
                 //                ret += "\n      )\n    )\n  )\n";
-                ret += $" ) ( layer {Brd.GetLayer(Layer)}) (width 0)\n    )\n";
-
-                return ret;
+                ret.Append($" ) ( layer {Brd.GetLayer(Layer)}) (width 0)\n    )\n");
+*/
+                return ret.ToString();
             }
         }
 
@@ -168,8 +200,8 @@ namespace ConvertToKicad
                         {
                             ms.Seek(0, SeekOrigin.Begin);
                             Layer = (Layers)br.ReadByte();
-                            ms.Seek(2, SeekOrigin.Begin);
-                            bool Keepout = br.ReadByte() != 0;
+                            ms.Seek(1, SeekOrigin.Begin);
+                            short Flags = (short)br.ReadInt16();
                             ms.Seek(3, SeekOrigin.Begin);
                             int net = (int)br.ReadInt16();
                             ms.Seek(7, SeekOrigin.Begin);
@@ -184,9 +216,7 @@ namespace ConvertToKicad
                             ms.Seek(0x16 + strlen, SeekOrigin.Begin);
                             Int32 DataLen = br.ReadInt32();
                             string l = Brd.GetLayer((Layers)Layer);
-                            if (GetString(str, "ISBOARDCUTOUT=") == "TRUE")
-                                l = "Edge.Cuts";
-                            Region r = new Region(l, net, Keepout);
+                            Region r = new Region(l, net, Flags);
 
                             while (DataLen-- > 0)
                             {
@@ -196,7 +226,6 @@ namespace ConvertToKicad
                                     return false;
                                 r.AddPoint(X, Y);
                             }
-                            r.Keepout = Keepout;
 
                             if (!InComponent)
                             {
@@ -204,7 +233,7 @@ namespace ConvertToKicad
                             }
                             else
                             {
-                                if (!Keepout)
+                                if (!r.Keepout && !r.PolygonCutout)
                                     ModulesL[Component].Regions.Add(r);
                                 else
                                     // until keepouts are allowed in components

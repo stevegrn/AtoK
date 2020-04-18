@@ -47,7 +47,7 @@ namespace ConvertToKicad
                     // it's a circle
                     return $"    (fp_circle (center {Math.Round(X1 - x, Precision)} {Math.Round(-(Y1 - y), Precision)}) (end {Math.Round(X2 - x, Precision)} {Math.Round(-(Y2 - y), Precision)}) (layer {Layer}) (width {Width}))\n";
                 else
-                    return $"    (fp_arc (start {Math.Round(X1 - x, Precision)} {Math.Round(-(Y1 - y), Precision)}) (end {Math.Round(X2 - x, Precision)} {Math.Round(-(Y2 - y), Precision)}) (angle {Angle}) (layer {Layer}) (width {Width}))\n";
+                    return $"    (fp_arc (start {Math.Round(X1 - x, Precision)} {Math.Round(-(Y1 - y), Precision)}) (end {Math.Round(X2 - x, Precision)} {Math.Round(-(Y2 - y), Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {Layer}) (width {Width}))\n";
             }
 
             public override string ToString(double x, double y, double ModuleRotation)
@@ -64,7 +64,7 @@ namespace ConvertToKicad
                 }
                 else
                 {
-                    return $"    (fp_arc (start {p1.X} {-p1.Y}) (end {p2.X} {-p2.Y}) (angle {Angle}) (layer {Layer}) (width {Width}))\n";
+                    return $"    (fp_arc (start {Math.Round(p1.X, Precision)} {Math.Round(-p1.Y, Precision)}) (end {Math.Round(p2.X, Precision)} {Math.Round(-p2.Y, Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {Layer}) (width {Width}))\n";
                 }
             }
         }
@@ -110,12 +110,12 @@ namespace ConvertToKicad
                 net = a.net;
                 net++;
                 Component = a.Component;
-                X1 = Math.Round((double)a.X1 * 25.4 / 10000000 - originX, Precision);
-                Y1 = Math.Round((double)a.Y1 * 25.4 / 10000000 - originY, Precision);
-                Radius = Math.Round((double)a.Radius * 25.4 / 10000000, Precision);
+                X1 = (double)a.X1 * 25.4 / 10000000 - originX;
+                Y1 = (double)a.Y1 * 25.4 / 10000000 - originY;
+                Radius = (double)a.Radius * 25.4 / 10000000;
                 StartAngle = a.StartAngle;
                 EndAngle = a.EndAngle % 360;
-                Width = Math.Round((double)(a.Width * 25.4 / 10000000), Precision);
+                Width = (double)a.Width * 25.4 / 10000000;
 
                 bool InComponent = Component != -1;
                 double Angle;
@@ -123,9 +123,9 @@ namespace ConvertToKicad
                 if (EndAngle < StartAngle)
                     EndAngle += 360;
 
-                Angle = Math.Round(-(EndAngle - StartAngle), Precision);
-                double X = Math.Round(X1 + Radius * Math.Cos(StartAngle * Math.PI / 180), Precision);
-                double Y = Math.Round(Y1 + Radius * Math.Sin(StartAngle * Math.PI / 180), Precision);
+                Angle = -(EndAngle - StartAngle);
+                double X = X1 + Radius * Math.Cos(StartAngle * Math.PI / 180);
+                double Y = Y1 + Radius * Math.Sin(StartAngle * Math.PI / 180);
                 string layer = Brd.GetLayer(Layer);
 
                 if (!InComponent)
@@ -139,37 +139,40 @@ namespace ConvertToKicad
                         double XC = X1;
                         double YC = Y1;
 
-                        X = Math.Round(X - XC, Precision);
-                        Y = Math.Round(Y - YC, Precision);
+                        X = X - XC;
+                        Y = Y - YC;
 
                         double radius = Math.Sqrt(X * X + Y * Y);
                         // start angle in radians
                         double start_angle = StartAngle * Math.PI / 180;
                         double end_angle = EndAngle * Math.PI / 180;
-                        double X2 = Math.Round(Radius * Math.Cos(end_angle), Precision);
-                        double Y2 = Math.Round(Radius * Math.Sin(end_angle), Precision);
-                        X = Math.Round(Radius * Math.Cos(start_angle), Precision);
-                        Y = Math.Round(Radius * Math.Sin(start_angle), Precision);
+                        double X2 = Radius * Math.Cos(end_angle);
+                        double Y2 = Radius * Math.Sin(end_angle);
+                        X = Radius * Math.Cos(start_angle);
+                        Y = Radius * Math.Sin(start_angle);
 
+                        // generate arc segments at 5° increments
                         for (double angle = start_angle; angle < end_angle; angle += 2 * Math.PI / 72)
                         {
-                            X1 = Math.Round(Radius * Math.Cos(angle), Precision);
-                            Y1 = Math.Round(Radius * Math.Sin(angle), Precision);
-                            tracks += ($"  (segment (start {XC + X} {-(YC + Y)}) (end {XC + X1} {-(YC + Y1)}) (width {Width}) (layer {layer}) (net {net}))\n");
+                            X1 = Radius * Math.Cos(angle);
+                            Y1 = Radius * Math.Sin(angle);
+                            tracks.Append($"  (segment (start {XC + X} {-(YC + Y)}) (end {XC + X1} {-(YC + Y1)}) (width {Width}) (layer {layer}) (net {net}))\n");
+                            //Line Line = new Line(X1, Y1, X2, Y2, Layer, Width, true);
+                            //Segments.Add(Line);
                             X = X1;
                             Y = Y1;
                         }
                         // do last segment
                         if (X != X2 || Y != Y2)
                         {
-                            tracks += ($"  (segment (start {X + XC} {-(Y + YC)}) (end {X2 + XC} {-(Y2 + YC)}) (width {Width}) (layer {layer}) (net {net}))\n");
+                            tracks.Append($"  (segment (start {X + XC} {-(Y + YC)}) (end {X2 + XC} {-(Y2 + YC)}) (width {Width}) (layer {layer}) (net {net}))\n");
                         }
                     }
                     else
                     {
                         // only add if not part of board outline
                         if ((layer != "Edge.Cuts") || !Brd.CheckExistingArc(X1, Y1, X, Y, Angle))
-                            arcs += $"  (gr_arc (start {X1} {-Y1}) (end {X} {-Y}) (angle {Angle}) (layer {layer}) (width {Width}))\n";
+                            arcs.Append($"  (gr_arc (start {Math.Round(X1, Precision)} {Math.Round(-Y1, Precision)}) (end {Math.Round(X, Precision)} {Math.Round(-Y, Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {layer}) (width {Width}))\n");
                     }
                 }
                 else

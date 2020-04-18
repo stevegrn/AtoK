@@ -51,12 +51,10 @@ namespace ConvertToKicad
         // class for the vias document entry in the pcbdoc file
         class Vias : PcbDocEntry
         {
-            // record size 208
+            // record size 208 (under Winter 09)
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
             unsafe struct ViaStruct
             {
-                public byte Type;                   //  00 1 3 - type
-                public UInt32 Offset;               //  01 4 203 - record size
                 public byte U0;                     //  05 1 ???
                 public byte U1;                     //  06 1 ???
                 public byte U2;                     //  07 1 ???
@@ -80,7 +78,47 @@ namespace ConvertToKicad
                 Binary_size = 208;
             }
 
-            public override bool ProcessLine(byte[] line)
+            public override bool ProcessBinaryFile(byte[] data)
+            {
+                bool GenerateTxtFile = true;
+                FileStream TextFile = null;
+                StartTimer();
+                if (Binary_size == 0)
+                    return false;
+
+                if (GenerateTxtFile)
+                {
+                    if (ExtractFiles)
+                        TextFile = File.Open("Data.txt", FileMode.OpenOrCreate);
+                }
+                try
+                {
+                    using (MemoryStream ms = new MemoryStream(data))
+                    {
+                        uint size = (uint)ms.Length;
+                        long p = 0;
+
+                        BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
+                        // find the headers and process
+                        while (p < size)
+                        {
+                            ms.Seek(p + 1, SeekOrigin.Begin);
+                            UInt32 RecordLength = br.ReadUInt32();
+                            // we are now pointing at a via record
+                            byte[] record = br.ReadBytes((int)RecordLength);
+                            p = ms.Position;
+                            ProcessLine(record);
+                        }
+                    }
+                }
+                catch (Exception Ex)
+                {
+                    CheckThreadAbort(Ex);
+                }
+                return true;
+        }
+
+        public override bool ProcessLine(byte[] line)
             {
                 Layers StartLayer, EndLayer;
                 double X, Y, Width, HoleSize;
@@ -110,7 +148,10 @@ namespace ConvertToKicad
                 {
                     // can't have vias in components in Kicad (yet) so add as a pad
                     Pad Pad = new Pad("0", "thru_hole", "circle", X, Y, 0, Width, Width, HoleSize, "*.Cu", Net, RRatio);
-                    ModulesL[Component].Pads.Add(Pad);
+                    if (Component > 0 && Component < ModulesL.Count)
+                        ModulesL[Component].Pads.Add(Pad);
+                    else
+                        OutputError($"Invalid component {Component}");
                 }
                 return true;
             }

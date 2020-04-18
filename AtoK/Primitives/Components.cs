@@ -202,11 +202,11 @@ namespace ConvertToKicad
                             if (pad.Type == "thru_hole")
                                 Attr = "";
 
-                    string ret = "";
-                    ret = $"  (module \"{Name}\" (layer {Layer}) {Tedit} {Tstamp}\n";
-                    ret += $"    (at {X} {-Y} {Rotation})\n";
+                    StringBuilder ret = new StringBuilder("");
+                    ret.Append($"  (module \"{Name}\" (layer {Layer}) {Tedit} {Tstamp}\n");
+                    ret.Append($"    (at {X} {-Y} {Rotation})\n");
                     if(Attr != "")
-                        ret += $"    (attr {Attr})\n";
+                        ret.Append($"    (attr {Attr})\n");
 
                     // this bit is for a particular test board where the idiot had put the Comment as .designator
                     if (Strings != null)
@@ -218,21 +218,21 @@ namespace ConvertToKicad
                                 str.Value = Designator;
                         }
 
-                    if (Strings != null) ret += Strings.ToString(X, Y, Rotation);
+                    if (Strings != null) ret.Append(Strings.ToString(X, Y, Rotation));
 
 
-                    if (Pads != null) ret += Pads.ToString(X, Y, Rotation);
+                    if (Pads != null) ret.Append(Pads.ToString(X, Y, Rotation));
                     // ret += Vias.ToString(X, Y, Rotation); // vias not allowed in modules...yet
-                    if (Lines != null) ret += Lines.ToString(X, Y, -Rotation);
-                    if (Arcs != null) ret += Arcs.ToString(X, Y, -Rotation);
-                    if (Fills != null) ret += Fills.ToString(X, Y, -Rotation);
-                    if (Polygons != null) ret += Polygons.ToString();
-                    if (Regions != null) ret += Regions.ToString(X, Y, -Rotation);
+                    if (Lines != null) ret.Append(Lines.ToString(X, Y, -Rotation));
+                    if (Arcs != null) ret.Append(Arcs.ToString(X, Y, -Rotation));
+                    if (Fills != null) ret.Append(Fills.ToString(X, Y, -Rotation));
+                    if (Polygons != null) ret.Append(Polygons.ToString());
+                    if (Regions != null) ret.Append(Regions.ToString(X, Y, -Rotation));
                     CurrentLayer = Layer;
-                    if (ComponentBodies != null) ret += ComponentBodies.ToString(X, Y, Rotation); // (Layer=="F.Cu")?-Rotation:-(Rotation-180));
-                    if (ShapeBasedModels != null) ret += ShapeBasedModels.ToString(X, Y, -Rotation);
-                    ret += "  )\n";
-                    return ret;
+                    if (ComponentBodies != null) ret.Append(ComponentBodies.ToString(X, Y, Rotation)); // (Layer=="F.Cu")?-Rotation:-(Rotation-180));
+                    if (ShapeBasedModels != null) ret.Append(ShapeBasedModels.ToString(X, Y, -Rotation));
+                    ret.Append("  )\n");
+                    return ret.ToString();
                 }
                 catch (Exception Ex)
                 {
@@ -244,11 +244,11 @@ namespace ConvertToKicad
             // output the module as a Library component
             public string ToModule()
             {
-                string ret = "";
-                ret = $"  (module \"{Name}\" (layer {Layer}) {Tedit} {Tstamp}\n";
-                ret += $"  (descr \"\")";
-                ret += $"  (tags \"\")";
-                if (Attr != "") ret += $"  (attr {Attr})\n";
+                StringBuilder ret = new StringBuilder("");
+                ret.Append($"  (module \"{Name}\" (layer {Layer}) {Tedit} {Tstamp}\n");
+                ret.Append($"  (descr \"\")");
+                ret.Append($"  (tags \"\")");
+                if (Attr != "") ret.Append($"  (attr {Attr})\n");
 
                 foreach (var String in Strings)
                 {
@@ -261,15 +261,15 @@ namespace ConvertToKicad
                         str = String.ToRefString(X, Y, Rotation);
                     }
 
-                    ret += str;
+                    ret.Append(str);
                 }
                 foreach (var Pad in Pads)
                 {
-                    ret += Pad.ToModuleString(X, Y, Rotation);
+                    ret.Append(Pad.ToModuleString(X, Y, Rotation));
                 }
                 foreach (var Line in Lines)
                 {
-                    ret += Line.ToString(X, Y, Rotation);
+                    ret.Append(Line.ToString(X, Y, Rotation));
                 }
                 // Vias in components are done as pads
                 //                foreach (var Via in Vias)
@@ -278,22 +278,22 @@ namespace ConvertToKicad
                 //                }
                 foreach (var Arc in Arcs)
                 {
-                    ret += Arc.ToString(X, Y, Rotation);
+                    ret.Append(Arc.ToString(X, Y, Rotation));
                 }
                 foreach (var Polygon in Polygons)
                 {
-                    ret += Polygon.ToString();
+                    ret.Append(Polygon.ToString());
                 }
                 foreach (var Fill in Fills)
-                    ret += Fill.ToString(X, Y, -Rotation);
+                    ret.Append(Fill.ToString(X, Y, -Rotation));
                 foreach (var region in Regions)
-                    ret += region.ToString(X, Y, -Rotation);
+                    ret.Append(region.ToString(X, Y, -Rotation));
                 foreach (var ComponentBody in ComponentBodies)
                 {
-                    ret += ComponentBody.ToString(X, Y, -Rotation);
+                    ret.Append(ComponentBody.ToString(X, Y, -Rotation));
                 }
-                ret += "  )\n";
-                return ret;
+                ret.Append("  )\n");
+                return ret.ToString();
             }
         }
 

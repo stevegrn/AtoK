@@ -215,7 +215,7 @@ namespace ConvertToKicad
                             bool InComponent = Component != -1;
                             double X = Math.Round(ToMM(text.X) - originX, Precision);
                             double Y = Math.Round(ToMM(text.Y) - originY, Precision);
-                            double Height = ToMM(text.Height);
+                            double Height = Math.Round(ToMM(text.Height), Precision);
                             double Rotation = text.Rotation % 360; // altium seem to store 0 as 360 quite a lot!
                             bool Mirror = text.Mirror != 0;
                             double Thickness = ToMM(text.Thickness);
@@ -235,7 +235,7 @@ namespace ConvertToKicad
                             if (TrueType)
                             {
                                 Thickness = Height / 10;    // fudge to get width the same as stroke font
-                                Height = Height / 2.2;     // fudge to get height the same as stroke font
+                                Height = Math.Round(Height / 2.2, Precision);     // fudge to get height the same as stroke font
                             }
 
                             str = str.Replace("\r", "");
@@ -246,7 +246,7 @@ namespace ConvertToKicad
                                 double X1 = Height / 2 * Math.Cos(Angle);
                                 double Y1 = Height / 2 * Math.Sin(Angle);
 
-                                texts += $"  (gr_text \"{ToLiteral(str)}\" (at {Math.Round(X - X1, Precision)} {-Math.Round(Y + Y1, Precision)} {Rotation})  (layer {layer}) (effects (font (size {Height} {Height}) (thickness {Thickness})) (justify left {(Mirror ? "mirror" : "")})))\n";
+                                texts.Append($"  (gr_text \"{ToLiteral(str)}\" (at {Math.Round(X - X1, Precision)} {-Math.Round(Y + Y1, Precision)} {Math.Round(Rotation, Precision)})  (layer {layer}) (effects (font (size {Height} {Height}) (thickness {Thickness})) (justify left {(Mirror ? "mirror" : "")})))\n");
                             }
                             else
                             {

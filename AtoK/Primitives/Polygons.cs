@@ -61,8 +61,7 @@ namespace ConvertToKicad
                 NetNo = net;
                 NetName = GetNetName(NetNo);
                 Points = new List<Point>();
-                string[] coords;
-                coords = line.Split('|');
+                string[] coords = line.Split('|');
                 // now add all the vertices
                 for (var j = 0; j < coords.Length; j++)
                 {
@@ -82,7 +81,7 @@ namespace ConvertToKicad
 
             public override string ToString()
             {
-                string ret = "";
+                StringBuilder ret = new StringBuilder("");
                 string connectstyle = "";
 
                 double clearance = GetRuleValue("Clearance", "PolygonClearance");
@@ -92,25 +91,25 @@ namespace ConvertToKicad
                     clearance = GetRuleValue("PlaneClearance", "PlaneClearance");
                 }
 
-                ret = $"  (zone (net {NetNo}) (net_name {NetName}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)";
-                ret += $"    (priority 100)\n";
-                ret += $"    (connect_pads {connectstyle} (clearance {clearance}))\n"; // TODO sort out these numbers properly
-                ret += $"    (min_thickness {TrackWidth})\n";
-                ret += "    (fill yes (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n";
+                ret.Append($"  (zone (net {NetNo}) (net_name {NetName}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)");
+                ret.Append($"    (priority 100)\n");
+                ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
+                ret.Append($"    (min_thickness {TrackWidth})\n");
+                ret.Append("    (fill yes (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n");
                 var i = 0;
-                ret += "    (polygon (pts\n        ";
+                ret.Append("    (polygon (pts\n        ");
                 foreach (var Point in Points)
                 {
                     i++;
                     if ((i % 5) == 0)
-                        ret += "\n        ";
-                    ret += Point.ToString();
+                        ret.Append("\n        ");
+                    ret.Append(Point.ToString());
                 }
-                ret += "\n      )\n    )\n  )\n";
+                ret.Append("\n      )\n    )\n  )\n");
                 if (IsSplitPlane)
-                    ret += "# Split Plane\n";
+                    ret.Append("# Split Plane\n");
 
-                return ret;
+                return ret.ToString();
             }
 
             public override string ToString(double x, double y, double rotation)

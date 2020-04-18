@@ -17,6 +17,7 @@ namespace ConvertToKicad
             double Y2 { get; set; }
             Layers Layer { get; set; }
             double Width { get; set; }
+            bool Segment { get; set; }
 
             private Line()
             {
@@ -28,7 +29,7 @@ namespace ConvertToKicad
                 Width = 0;
             }
 
-            public Line(double x1, double y1, double x2, double y2, Layers layer, double width)
+            public Line(double x1, double y1, double x2, double y2, Layers layer, double width, bool segment)
             {
                 X1 = x1;
                 Y1 = y1;
@@ -36,6 +37,7 @@ namespace ConvertToKicad
                 Y2 = y2;
                 Layer = layer;
                 Width = width;
+                Segment = segment;
             }
 
             public string ToString(double x, double y)
@@ -58,7 +60,8 @@ namespace ConvertToKicad
                 p2.Rotate(ModuleRotation);
 
                 // create line relative to component origin
-                return $"    (fp_line (start {p1.X} {-p1.Y}) (end {p2.X} {-p2.Y}) (layer {Brd.GetLayer(Layer)}) (width {Width}))\n";
+                string type = Segment ? "segment" : "fp_line";
+                return $"    ({type} (start {p1.X} {-p1.Y}) (end {p2.X} {-p2.Y}) (layer {Brd.GetLayer(Layer)}) (width {Width}))\n";
             }
         }
 
@@ -117,20 +120,22 @@ namespace ConvertToKicad
                         {
                             if ((Layer != "Edge.Cuts") || !Brd.CheckExistingLine(X1, -Y1, X2, -Y2))
                             {
-                                tracks += ($"  (gr_line (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}))\n");
+                                tracks.Append($"  (gr_line (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}))\n");
                                 track_count++;
                             }
                         }
                     }
                     else
                     {
-                        tracks += ($"  (segment (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}) (net {net}))\n");
+                        Line Line = new Line(X1, Y1, X2, Y2, layer, width, true);
+                       // Segments.Add(Line);
+                        tracks.Append($"  (segment (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}) (net {net}))\n");
                         track_count++;
                     }
                 }
                 else
                 {
-                    Line Line = new Line(X1, Y1, X2, Y2, layer, width);
+                    Line Line = new Line(X1, Y1, X2, Y2, layer, width, false);
                     ModulesL[ComponentNumber].Lines.Add(Line);
                 }
                 return true;

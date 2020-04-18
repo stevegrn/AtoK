@@ -26,13 +26,10 @@ namespace AtoK
         public static string TextEditorLocation = "";
         public static CleanEnum CleanFlag;
         ConcurrentQueue<string> dq = new ConcurrentQueue<string>();
-        //       Stream myStream;
-        //        StreamWriter myWriter;
         public static Thread t; // ues for running the convert in  the background
         private delegate void UpdateOutputDelegate(string s, Color colour);
 
         private UpdateOutputDelegate updateoutputDelegate = null;
-        private Color BackColor;
 
         public void UpdateOutput(string s, Color colour)
         {
@@ -66,11 +63,10 @@ namespace AtoK
             outputList_Initialize();
             FileHistory_Initialize();
             SaveExtractedDocs.CheckState = Properties.Settings.Default.SaveDocs ? CheckState.Checked : CheckState.Unchecked;
-            LibraryGen.CheckState = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
-            Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
-            FileHistory.Text = Properties.Settings.Default.LastFile;
+            LibraryGen.CheckState        = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
+            Verbose.CheckState           = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
+            FileHistory.Text             = Properties.Settings.Default.LastFile;
             FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
-            FileHistory.Text = FileHistory.Text;
 
             ComboboxItems = Properties.Settings.Default.ComboboxItems;
             string[] Items = ComboboxItems.Split(';');
@@ -79,7 +75,9 @@ namespace AtoK
                 if (item != "")
                     FileHistory.Items.Insert(0, item);
             }
-            FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
+            FileHistory.SelectedIndex = (ComboboxItems=="")?-1:Properties.Settings.Default.ComboBoxIndex;
+            Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
+            Properties.Settings.Default.Save();
         }
 
         // shutdown the worker thread when the form closes
@@ -131,27 +129,16 @@ namespace AtoK
 
             // build the outputList context menu
             popUpMenu = new ContextMenu();
-            popUpMenu.MenuItems.Add("&Copy", new EventHandler(outputList_Copy));
-            popUpMenu.MenuItems[0].Visible = true;
-            popUpMenu.MenuItems[0].Enabled = false;
-            popUpMenu.MenuItems[0].Shortcut = Shortcut.CtrlC;
-            popUpMenu.MenuItems[0].ShowShortcut = true;
+            popUpMenu.MenuItems.Add(new MenuItem("Delete selected",  outputList_DeleteSelected, Shortcut.CtrlX));
+            popUpMenu.MenuItems.Add(new MenuItem("Clear All",        outputList_ClearAll));
+            popUpMenu.MenuItems.Add(new MenuItem("Select &All",      outputList_SelectAll,      Shortcut.CtrlA));
+            popUpMenu.MenuItems.Add(new MenuItem("&Copy",            outputList_Copy,           Shortcut.CtrlC));
+            popUpMenu.MenuItems.Add(new MenuItem("Copy All",         outputList_CopyAll));
+            popUpMenu.MenuItems.Add(new MenuItem("Unselect",         outputList_ClearSelected));
+            popUpMenu.MenuItems.Add(new MenuItem("Toggle Scrolling", outputList_ToggleScrolling));
 
-            popUpMenu.MenuItems.Add("Copy All", new EventHandler(outputList_CopyAll));
-            popUpMenu.MenuItems[1].Visible = true;
-
-            popUpMenu.MenuItems.Add("Select &All", new EventHandler(outputList_SelectAll));
-            popUpMenu.MenuItems[2].Visible = true;
-            popUpMenu.MenuItems[2].Shortcut = Shortcut.CtrlA;
-            popUpMenu.MenuItems[2].ShowShortcut = true;
-
-            popUpMenu.MenuItems.Add("Unselect", new EventHandler(outputList_ClearSelected));
-            popUpMenu.MenuItems[3].Visible = true;
-            popUpMenu.MenuItems.Add("Delete selected", new EventHandler(outputList_DeleteSelected));
-            popUpMenu.MenuItems[4].Visible = true;
-            popUpMenu.MenuItems.Add("Clear All", new EventHandler(outputList_ClearAll));
-            popUpMenu.MenuItems[5].Visible = true;
-            popUpMenu.MenuItems.Add("Toggle Scrolling", new EventHandler(outputList_ToggleScrolling));
+            // despite the following the first item in the menu show up as "Clear All    Ctrl+X"
+            popUpMenu.MenuItems[0].ShowShortcut = false;
 
             outputList.ContextMenu = popUpMenu;
         }
@@ -192,7 +179,7 @@ namespace AtoK
             popUpMenu.MenuItems[0].Enabled = (outputList.SelectedItems.Count > 0);
         }
 
-        private void outputList_Copy(object sender, EventArgs e)
+        private void outputList_Copy()
         {
             int iCount = outputList.SelectedItems.Count;
             if (iCount > 0)
@@ -206,6 +193,11 @@ namespace AtoK
                 String dest = String.Join("\r\n", source);
                 Clipboard.SetText(dest);
             }
+        }
+
+        private void outputList_Copy(object sender, EventArgs e)
+        {
+            outputList_Copy();
         }
 
         private void outputList_CopyAll(object sender, EventArgs e)
@@ -243,8 +235,14 @@ namespace AtoK
         private void outputList_DeleteSelected(object sender, EventArgs e)
         {
             outputList.BeginUpdate();
-            // Remove each item in reverse order to maintain integrity
             var selectedIndices = new List<int>(outputList.SelectedIndices.Cast<int>());
+            // but first copy selected text to the clipboard
+            StringBuilder Selected = new StringBuilder("");
+            selectedIndices.ForEach(index => Selected.Append(((Line)outputList.Items[index]).Str + "\n"));
+            String dest = String.Join("\r\n", Selected.ToString());
+            Clipboard.SetText(dest);
+            // now delete the items
+            // Remove each item in reverse order to maintain integrity
             selectedIndices.Reverse();
             selectedIndices.ForEach(index => outputList.Items.RemoveAt(index));
 
@@ -729,12 +727,15 @@ namespace AtoK
                     sb.Append(item.ToString() + ";");
             }
             string Items = sb.ToString();
-            char[] charsToTrim = { ';' };
-            string It = Items.Substring(0, Items.Length - 1);
-
-            Properties.Settings.Default.ComboboxItems = It;
+            if (Items != "")
+            {
+                char[] charsToTrim = { ';' };
+                Items = Items.Substring(0, Items.Length - 1);
+            }
+            Properties.Settings.Default.ComboboxItems = Items;
             Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
             Properties.Settings.Default.Save();
+
         }
 
         void CheckOutputDir()
@@ -798,6 +799,15 @@ namespace AtoK
             OptionsForm.Show();
         }
 
+        private void outputList_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            char key = e.KeyChar;
+            switch((int)key)
+            {
+                case 3: outputList_Copy(); break;
+                default: break;
+            }
+        }
     }
 }
 

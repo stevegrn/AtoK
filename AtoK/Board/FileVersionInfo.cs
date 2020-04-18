@@ -9,6 +9,8 @@ namespace ConvertToKicad
     public partial class ConvertPCBDoc
     {
         public static bool Post09;
+        public static string VersionString;
+
         // class to hold version info
         class Version
         {
@@ -177,6 +179,7 @@ namespace ConvertToKicad
                 OutputString($"Board last saved by \"Altium {Versions[Versions.Count - 1].VER}\"");
                 if (Versions[Versions.Count - 1].VER.Contains("Release"))
                     Post09 = true;
+                VersionString = Versions[Versions.Count - 1].VER;
             }
 
             public int GetPadLength()
