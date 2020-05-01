@@ -246,7 +246,20 @@ namespace ConvertToKicad
                                 double X1 = Height / 2 * Math.Cos(Angle);
                                 double Y1 = Height / 2 * Math.Sin(Angle);
 
-                                texts.Append($"  (gr_text \"{ToLiteral(str)}\" (at {Math.Round(X - X1, Precision)} {-Math.Round(Y + Y1, Precision)} {Math.Round(Rotation, Precision)})  (layer {layer}) (effects (font (size {Height} {Height}) (thickness {Thickness})) (justify left {(Mirror ? "mirror" : "")})))\n");
+                                List<string> Layers = new List<string>();
+                                if (layer == "*.Cu")
+                                {
+                                    foreach (var L in Brd.OrderedLayers)
+                                    {
+                                        Layers.Add(L.PcbNewLayer);
+                                    }
+                                }
+                                else
+                                    Layers.Add(layer);
+                                foreach (var L in Layers)
+                                {
+                                    texts.Append($"  (gr_text \"{ToLiteral(str)}\" (at {Math.Round(X - X1, Precision)} {-Math.Round(Y + Y1, Precision)} {Math.Round(Rotation, Precision)})  (layer {L}) (effects (font (size {Height} {Height}) (thickness {Thickness})) (justify left {(Mirror ? "mirror" : "")})))\n");
+                                }
                             }
                             else
                             {

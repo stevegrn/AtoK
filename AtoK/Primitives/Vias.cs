@@ -110,6 +110,7 @@ namespace ConvertToKicad
                             ProcessLine(record);
                         }
                     }
+                    TextFile.Close();
                 }
                 catch (Exception Ex)
                 {

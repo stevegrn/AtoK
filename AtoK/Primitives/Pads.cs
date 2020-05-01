@@ -386,7 +386,7 @@ namespace ConvertToKicad
                                                 found = false;
                                             if (found)
                                             {
-                                                //OutputString($"Found header at {pos:x08}");
+                                               // OutputString($"Found header at {pos:x08}");
                                                 Starts.Add(pos);
                                             }
                                         }
@@ -404,6 +404,7 @@ namespace ConvertToKicad
                         {
                             UInt32 Longest = 0;
                             UInt32 len;
+                            // find the length of the logest pad record
                             foreach (var p in Starts)
                             {
                                 index++;
@@ -417,7 +418,7 @@ namespace ConvertToKicad
                                     Longest = len;
                             }
                             index = -1;
-                            if (GenerateTxtFile)
+                            if (GenerateTxtFile && ExtractFiles)
                             {
                                 AddText(TextFile, $"Altium Version {VersionString}\n");
                                 // generate headers for .txt file
@@ -440,6 +441,7 @@ namespace ConvertToKicad
                             foreach (var p in Starts)
                             {
                                 pos = p;
+                                //OutputString($"Processing pad record at {pos:x08}");
                                 index++;
                                 base.ProcessLine();
                                 ms.Seek(p, SeekOrigin.Begin);
@@ -559,7 +561,11 @@ namespace ConvertToKicad
                                     type = "smd";
                                 string layer = Brd.GetLayer(Layer);
                                 if (!Brd.IsCopperLayer(Layer))
-                                    return false; 
+                                {
+                                    OutputError($"Pad on non copper layer = {Layer} at {X} {-Y}");
+                                    // TODO generate circular polygon instead
+                                    continue;
+                                }
                                 if (layer == "Margin") // TODO sort this keepout layer malarky
                                     layer = "Dwgs.User";
                                 if (type == "smd")

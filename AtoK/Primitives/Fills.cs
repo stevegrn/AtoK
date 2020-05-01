@@ -143,11 +143,22 @@ namespace ConvertToKicad
                             layer = "*.Cu";
                         else
                             layer = Brd.GetLayer(Layer);
-
-                        // generate a keepout
-                        keepouts +=
+                        List<string> layers = new List<string>();
+                        if (layer == "*.Cu")
+                        {
+                            foreach (var L in Brd.OrderedLayers)
+                            {
+                                layers.Add(L.PcbNewLayer);
+                            }
+                        }
+                        else
+                            layers.Add(layer);
+                        foreach (var L in layers)
+                        {
+                            // generate a keepout
+                            keepouts.Append(
 $@"
-    (zone(net 0)(net_name """")(layers {layer})(tstamp 0)(hatch edge 0.508)
+    (zone(net 0)(net_name """")(layers {L})(tstamp 0)(hatch edge 0.508)
       (connect_pads(clearance 0.508))
       (min_thickness 0.254)
       (keepout(tracks not_allowed)(vias not_allowed)(copperpour not_allowed))
@@ -158,12 +169,27 @@ $@"
          )
       )
     )
-";
+");
+                        }
 
                     }
                     else if (!InComponent) // keepouts not allowed in components (yet)
                     {
-                        fills += $"(gr_poly (pts (xy {X1} {-(Y1)}) (xy {X1} {-(Y2)}) (xy {X2} {-(Y2)}) (xy {X2} {-(Y1)})) (layer {Brd.GetLayer(Layer)}) (width 0))\n";
+                        string layer = Brd.GetLayer(Layer);
+                        List<string> layers = new List<string>();
+                        if (layer == "*.Cu")
+                        {
+                            foreach (var L in Brd.OrderedLayers)
+                            {
+                                layers.Add(L.PcbNewLayer);
+                            }
+                        }
+                        else
+                            layers.Add(layer);
+                        foreach (var L in layers)
+                        {
+                            fills.Append($"  (gr_poly (pts (xy {X1} {-(Y1)}) (xy {X1} {-(Y2)}) (xy {X2} {-(Y2)}) (xy {X2} {-(Y1)})) (layer {L}) (width 0))\n");
+                        }
                     }
                     else
                     {

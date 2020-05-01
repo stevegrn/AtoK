@@ -172,7 +172,22 @@ namespace ConvertToKicad
                     {
                         // only add if not part of board outline
                         if ((layer != "Edge.Cuts") || !Brd.CheckExistingArc(X1, Y1, X, Y, Angle))
-                            arcs.Append($"  (gr_arc (start {Math.Round(X1, Precision)} {Math.Round(-Y1, Precision)}) (end {Math.Round(X, Precision)} {Math.Round(-Y, Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {layer}) (width {Width}))\n");
+                        {
+                            List<string> Layers = new List<string>();
+                            if (layer == "*.Cu")
+                            {
+                                foreach (var L in Brd.OrderedLayers)
+                                {
+                                    Layers.Add(L.PcbNewLayer);
+                                }
+                            }
+                            else
+                                Layers.Add(layer);
+                            foreach (var L in Layers)
+                            {
+                                arcs.Append($"  (gr_arc (start {Math.Round(X1, Precision)} {Math.Round(-Y1, Precision)}) (end {Math.Round(X, Precision)} {Math.Round(-Y, Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {L}) (width {Width}))\n");
+                            }
+                        }
                     }
                 }
                 else

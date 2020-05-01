@@ -87,19 +87,21 @@ namespace ConvertToKicad
                 public int Number { get; set; }
                 public string PcbNewLayer { get; set; }
                 public string AltiumName { get; set; }
+
                 public Layer(string line, int number)
                 {
-                    Name = GetString(line, $"LAYER{number}NAME=");
-                    Prev = Convert.ToInt16(GetString(line, $"LAYER{number}PREV="));
-                    Next = Convert.ToInt16(GetString(line, $"LAYER{number}NEXT="));
-                    MechEnabled = GetString(line, $"LAYER{number}MECHENABLED=") == "TRUE";
-                    CopperThickness = GetNumberInMM(GetString(line, $"LAYER{number}COPTHICK="));
-                    DielectricType = Convert.ToInt16(GetString(line, $"LAYER{number}DIELTYPE="));
+                    string[] words = line.Split('|');
+                    Name               = GetString(line, $"LAYER{number}NAME=");
+                    Prev               = Convert.ToInt16(GetString(line, $"LAYER{number}PREV="));
+                    Next               = Convert.ToInt16(GetString(line, $"LAYER{number}NEXT="));
+                    MechEnabled        = GetString(line, $"LAYER{number}MECHENABLED=") == "TRUE";
+                    CopperThickness    = GetNumberInMM(GetString(line, $"LAYER{number}COPTHICK="));
+                    DielectricType     = Convert.ToInt16(GetString(line, $"LAYER{number}DIELTYPE="));
                     DielectricConstant = Convert.ToDouble(GetString(line, $"LAYER{number}DIELCONST="));
-                    DielectricHeight = GetNumberInMM(GetString(line, $"LAYER{number}DIELHEIGHT="));
+                    DielectricHeight   = GetNumberInMM(GetString(line, $"LAYER{number}DIELHEIGHT="));
                     DielectricMaterial = GetString(line, $"LAYER{number}DIELMATERIAL=");
-                    Number = number;
-                    AltiumName = LayerNames[Number];
+                    Number             = number;
+                    AltiumName         = LayerNames[Number];
                 }
 
                 public void AssignPcbNewLayer(int Number, int total)
@@ -135,7 +137,7 @@ namespace ConvertToKicad
             {
                 if (Length(x1, y1, x2, y2) <= 0.01)
                 {
-                    OutputError($"Rejected zero length line in boundary at {x1} {y1} {x2} {y2}");
+                    OutputError($"Rejected zero length line in boundary at {x1} {-y1} {x2} {-y2}");
                     return;
                 }
                 BoundaryObject Line = new BoundaryObject(x1, y1, x2, y2);
@@ -161,7 +163,7 @@ namespace ConvertToKicad
             {
                 if (ArcLength(X1, Y1, X2, Y2, Angle)<=0.01)
                 {
-                    OutputError($"Rejected zero length arc in boundary {X1} {Y1} {X2} {Y2} {Angle}");
+                    OutputError($"Rejected zero length arc in boundary {X1} {-Y1} {X2} {-Y2} {Angle}");
                     return;
                 }
                 BoundaryObject Arc = new BoundaryObject(X1, Y1, X2, Y2, Angle);
@@ -180,6 +182,7 @@ namespace ConvertToKicad
 
             public override bool ProcessLine(string line)
             {
+                string[] words = line.Split('|');
                 base.ProcessLine();
                 try
                 {
@@ -217,55 +220,39 @@ namespace ConvertToKicad
                         } while (!done);
 
                         count = 0;
-                        double x, y, cx, cy, sa, ea, r, x0 = 0, y0 = 0, nx, ny;
-                        foreach (var found in strings)
+                        while(strings.Count >= 2)
                         {
-                            search = $"KIND{count}=";
-                            string Kind = GetString(found, search);
-                            x = GetCoordinateX(GetString(found, $"VX{count}="));
-                            y = GetCoordinateY(GetString(found, $"VY{count}="));
-                            if (count == 0)
-                            {
-                                // record first coordinate
-                                x0 = x;
-                                y0 = y;
-                            }
-                            if (count < strings.Count - 1)
-                            {
-                                nx = GetCoordinateX(GetString(strings[count + 1], $"VX{count + 1}="));
-                                ny = GetCoordinateY(GetString(strings[count + 1], $"VY{count + 1}="));
-                            }
-                            else
-                            {
-                                nx = x0;
-                                ny = y0;
-                            }
-                            cx = GetCoordinateX(GetString(found, $"CX{count}="));
-                            cy = GetCoordinateY(GetString(found, $"CY{count}="));
-                            sa = Convert.ToDouble(GetString(found, $"SA{count}="));
-                            ea = Convert.ToDouble(GetString(found, $"EA{count}="));
-                            r = GetNumberInMM(GetString(found, $"R{count}="));
-                            count++;
+                            string Kind = GetString(strings[0], $"KIND{count}=");
                             if (Kind == "0")
                             {
+                                // Line
+                                double x  = GetCoordinateX(GetString(strings[0], $"VX{count}="));
+                                double y  = GetCoordinateY(GetString(strings[0], $"VY{count}="));
+                                double nx = GetCoordinateX(GetString(strings[1], $"VX{count + 1}="));
+                                double ny = GetCoordinateY(GetString(strings[1], $"VY{count + 1}="));
                                 BoardAddLine(x, y, nx, ny);
                             }
                             else
                             {
-                                double X1 = cx;
-                                double Y1 = cy;
+                                // Arc
+                                double r  = GetNumberInMM(GetString(strings[0], $"R{count}="));
 
+                                double cx = GetCoordinateX(GetString(strings[0], $"CX{count}="));
+                                double cy = GetCoordinateY(GetString(strings[0], $"CY{count}="));
 
+                                double sa = Convert.ToDouble(GetString(strings[0], $"SA{count}="));
+                                double ea = Convert.ToDouble(GetString(strings[0], $"EA{count}="));
                                 if (ea < sa)
                                     ea += 360;
 
                                 double Angle = Math.Round(-(ea - sa), Precision);
                                 double X = Math.Round(cx + r * Math.Cos(sa * Math.PI / 180), Precision);
                                 double Y = Math.Round(cy + r * Math.Sin(sa * Math.PI / 180), Precision);
-                                BoardAddArc(X1, Y1, X, Y, Angle);
+                                BoardAddArc(cx, cy, X, Y, Angle);
                             }
+                            strings.RemoveAt(0); // finished with coordinate
+                            count++;
                         }
-
                     }
 
                     if (LayersL.Count == 0)
@@ -437,32 +424,32 @@ namespace ConvertToKicad
                                         case "PLANE1": layer += "In1.Cu"; break;
                                         case "PLANE2": layer += "In2.Cu"; break;
                     */
-                    case "MULTILAYER":    layer += "F.Cu F.Mask B.Cu B.Mask"; break;
-                    case "TOPOVERLAY":    layer += "F.SilkS"; break;
-                    case "BOTTOMOVERLAY": layer += "B.SilkS"; break;
-                    case "KEEPOUT":       layer += "Margin"; break;
-                    case "MECHANICAL1":   layer += "Edge.Cuts"; break;
-                    case "MECHANICAL2":   layer += "Dwgs.User"; break;
-                    case "MECHANICAL3":   layer += "Dwgs.User"; break;
-                    case "MECHANICAL4":   layer += "Dwgs.User"; break;
-                    case "MECHANICAL5":   layer += "Dwgs.User"; break;
-                    case "MECHANICAL6":   layer += "Dwgs.User"; break;
-                    case "MECHANICAL7":   layer += "Dwgs.User"; break;
-                    case "MECHANICAL8":   layer += "Dwgs.User"; break;
-                    case "MECHANICAL9":   layer += "Dwgs.User"; break;
-                    case "MECHANICAL10":  layer += "Dwgs.User"; break;
-                    case "MECHANICAL11":  layer += "Eco1.User"; break;
-                    case "MECHANICAL12":  layer += "Dwgs.User"; break;
+                    case "MULTILAYER":    return "*.Cu";
+                    case "TOPOVERLAY":    return "F.SilkS";
+                    case "BOTTOMOVERLAY": return "B.SilkS";
+                    case "KEEPOUT":       return "Margin";
+                    case "MECHANICAL1":   return "Edge.Cuts";
+                    case "MECHANICAL2":   return "Dwgs.User";
+                    case "MECHANICAL3":   return "Dwgs.User";
+                    case "MECHANICAL4":   return "Dwgs.User";
+                    case "MECHANICAL5":   return "Dwgs.User";
+                    case "MECHANICAL6":   return "Dwgs.User";
+                    case "MECHANICAL7":   return "Dwgs.User";
+                    case "MECHANICAL8":   return "Dwgs.User";
+                    case "MECHANICAL9":   return "Dwgs.User";
+                    case "MECHANICAL10":  return "Dwgs.User";
+                    case "MECHANICAL11":  return "Eco1.User";
+                    case "MECHANICAL12":  return "Dwgs.User";
                     case "MECHANICAL13":  return "Dwgs.User";
-                    case "MECHANICAL14": layer += "Dwgs.User"; break;
-                    case "MECHANICAL15": layer += "F.CrtYd"; break;
-                    case "MECHANICAL16": layer += "B.CrtYd"; break;
-                    case "TOPSOLDER":    layer += "F.Mask"; break;
-                    case "BOTTOMSOLDER": layer += "B.Mask"; break;
-                    case "BOTTOMPASTE":  layer += "B.Paste"; break;
-                    case "TOPPASTE":     layer += "F.Paste"; break;
-                    case "DRILLDRAWING": layer += "Dwgs.User"; break;
-                    case "DRILLGUIDE":   layer += "Dwgs.User"; break;
+                    case "MECHANICAL14":  return "Dwgs.User";
+                    case "MECHANICAL15":  return "F.CrtYd";
+                    case "MECHANICAL16":  return "B.CrtYd";
+                    case "TOPSOLDER":     return "F.Mask";
+                    case "BOTTOMSOLDER":  return "B.Mask";
+                    case "BOTTOMPASTE":   return "B.Paste";
+                    case "TOPPASTE":      return "F.Paste";
+                    case "DRILLDRAWING":  return "Dwgs.User";
+                    case "DRILLGUIDE":    return "Dwgs.User";
                     default: return AltiumLayer;
                 }
                 return layer;

@@ -22,8 +22,8 @@ namespace AtoK
             All
         }
 
-        public static string PcbNewLocation="";
-        public static string TextEditorLocation = "";
+        public static string PcbnewLocation { get; set;}
+        public static string TextEditorLoc { get; set; }
         public static CleanEnum CleanFlag;
         ConcurrentQueue<string> dq = new ConcurrentQueue<string>();
         public static Thread t; // ues for running the convert in  the background
@@ -37,6 +37,12 @@ namespace AtoK
             outputList.Update();
         }
 
+        public void SetTextEditorLocation(string Location)
+        {
+            TextEditorLoc = Location;
+            Properties.Settings.Default.TextEditorLocation = Location;
+            Properties.Settings.Default.Save();
+        }
 
         public class Line
         {
@@ -53,12 +59,14 @@ namespace AtoK
         int outputlist_width = 0;
         ArrayList lines = new ArrayList();
         string ComboboxItems = "";
+        Size MaximisedSize;
 
         public Form1()
         {
             Screen scrn = Screen.FromControl(this);
 
             InitializeComponent();
+            MaximisedSize = new Size(0, 0);
 
             outputList_Initialize();
             FileHistory_Initialize();
@@ -77,6 +85,130 @@ namespace AtoK
             }
             FileHistory.SelectedIndex = (ComboboxItems=="")?-1:Properties.Settings.Default.ComboBoxIndex;
             Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
+            Properties.Settings.Default.Save();
+            PcbnewLocation = "";
+            TextEditorLoc = "";
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            updateoutputDelegate = new UpdateOutputDelegate(UpdateOutput);
+
+            if (!isFormFullyVisible(Properties.Settings.Default.F1Location, Properties.Settings.Default.F1Size) || Properties.Settings.Default.F1Size.Width == 0 || Properties.Settings.Default.F1Size.Height == 0)
+            {
+                // first start or form not visible due to monitor setup changing since last saved
+                // optional: add default values
+            }
+            else
+            {
+                this.WindowState = Properties.Settings.Default.F1State;
+
+                // we don't want a minimized window at startup
+                if (this.WindowState == FormWindowState.Minimized)
+                    this.WindowState = FormWindowState.Normal;
+
+                this.Location = Properties.Settings.Default.F1Location;
+                if (Properties.Settings.Default.F1Size.Width < Edit.Width + Edit.Location.X + 25)
+                    // n.b. this calls the Form1_Resize
+                    this.Size = new Size(Edit.Right + 28, Properties.Settings.Default.F1Size.Height+5);
+                else
+                    // n.b. this calls the Form1_Resize
+                    this.Size = Properties.Settings.Default.F1Size; // TODO sort out when this gets screwed 
+                this.Update();
+                MaximisedSize = this.Size;
+            }
+            SaveExtractedDocs.CheckState = Properties.Settings.Default.SaveDocs ? CheckState.Checked : CheckState.Unchecked;
+            LibraryGen.CheckState        = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
+            Verbose.CheckState           = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
+            ConvertPCBDoc.Verbose        = Verbose.CheckState == CheckState.Checked;
+            string Combo                 = Properties.Settings.Default.ComboboxItems;
+            PcbnewLocation               = Properties.Settings.Default.PcbnewLocation;
+            TextEditorLoc                = Properties.Settings.Default.TextEditorLocation;
+
+            string[] items = Combo.Split(';');
+
+            // remove any duplicates
+            var b = new HashSet<string>(items);
+
+            FileHistory.ContextMenu = ComboBoxMenu;
+            FileHistory.Items.Clear();
+            FileHistory.Items.AddRange(b.ToArray());
+            if (b.ToArray().Length != items.Length)
+            {
+                // some duplicate items have been removed
+                // so selected index will no longer be valid
+                FileHistory.SelectedIndex = 0;
+            }
+            else
+                FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
+
+            EnableControls();
+        }
+
+        FormWindowState LastWindowState = FormWindowState.Minimized;
+
+        private void Form1_Resize(object sender, EventArgs e)
+        {
+            if (WindowState != LastWindowState)
+            {
+                LastWindowState = WindowState;
+
+                if (WindowState == FormWindowState.Maximized)
+                {
+                    Size = MaximisedSize;
+                }
+            }
+            if (WindowState == FormWindowState.Normal)
+            {
+                this.MinimumSize = new Size(this.Width, 0);
+                this.MaximumSize = new Size(this.Width, Int32.MaxValue);
+                Control control = (Control)sender;
+                // resize the output window 
+                // set top to bottom of button1
+                // set bottom to bottom of form
+                // set left to left of form
+                // set right to right of form
+                outputList.Width = ClearHistory.Right - SelectSource.Left;
+                outputList.Left = FileHistory.Left;
+                outputList.Top = Verbose.Bottom + 10;
+                outputList.Height = control.Height - Verbose.Bottom - 60;
+                if (outputList.Height < outputList.ItemHeight)
+                {
+                    outputList.Height = outputList.ItemHeight;
+                    this.Height = outputList.Bottom + 50;
+                }
+                MaximisedSize = this.Size;
+            }
+
+        }
+
+        private void Form1_Closing(object sender, FormClosingEventArgs e)
+        {
+            if (t != null && t.IsAlive)
+            {
+                t.Abort();
+            }
+            Properties.Settings.Default.F1State = this.WindowState;
+            if (this.WindowState == FormWindowState.Normal)
+            {
+                // save location and size if the state is normal
+                Properties.Settings.Default.F1Location = this.Location;
+                Properties.Settings.Default.F1Size = this.Size;
+            }
+            else
+            {
+                // save the RestoreBounds if the form is minimized or maximized!
+                Properties.Settings.Default.F1Location = this.RestoreBounds.Location;
+                Properties.Settings.Default.F1Size = this.RestoreBounds.Size;
+            }
+            Properties.Settings.Default.SaveDocs = SaveExtractedDocs.CheckState == CheckState.Checked;
+            Properties.Settings.Default.GenLib = LibraryGen.CheckState == CheckState.Checked;
+            Properties.Settings.Default.Verbose = Verbose.CheckState == CheckState.Checked;
+            Properties.Settings.Default.LastFile = FileHistory.Text;
+            Properties.Settings.Default.PcbnewLocation = PcbnewLocation;
+            Properties.Settings.Default.TextEditorLocation = TextEditorLoc;
+            SaveFileHistory();
+            // don't forget to save the settings
             Properties.Settings.Default.Save();
         }
 
@@ -240,13 +372,16 @@ namespace AtoK
             StringBuilder Selected = new StringBuilder("");
             selectedIndices.ForEach(index => Selected.Append(((Line)outputList.Items[index]).Str + "\n"));
             String dest = String.Join("\r\n", Selected.ToString());
-            Clipboard.SetText(dest);
-            // now delete the items
-            // Remove each item in reverse order to maintain integrity
-            selectedIndices.Reverse();
-            selectedIndices.ForEach(index => outputList.Items.RemoveAt(index));
+            if (dest != "")
+            {
+                Clipboard.SetText(dest);
+                // now delete the items
+                // Remove each item in reverse order to maintain integrity
+                selectedIndices.Reverse();
+                selectedIndices.ForEach(index => outputList.Items.RemoveAt(index));
 
-            outputList.SelectedItem = -1;
+                outputList.SelectedItem = -1;
+            }
             outputList.EndUpdate();
         }
 
@@ -286,89 +421,6 @@ namespace AtoK
             return isPointVisibleOnAScreen(p)
                 && isPointVisibleOnAScreen(new Point(p.X + size.Width, p.Y))
                 && isPointVisibleOnAScreen(new Point(p.X + size.Width, p.Y + size.Height));
-        }
-
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            updateoutputDelegate = new UpdateOutputDelegate(UpdateOutput);
-
-            if (!isFormFullyVisible(Properties.Settings.Default.F1Location, Properties.Settings.Default.F1Size) || Properties.Settings.Default.F1Size.Width == 0 || Properties.Settings.Default.F1Size.Height == 0)
-            {
-                // first start or form not visible due to monitor setup changing since last saved
-                // optional: add default values
-            }
-            else
-            {
-                this.WindowState = Properties.Settings.Default.F1State;
-
-                // we don't want a minimized window at startup
-                if (this.WindowState == FormWindowState.Minimized)
-                    this.WindowState = FormWindowState.Normal;
-
-                this.Location = Properties.Settings.Default.F1Location;
-                if (Properties.Settings.Default.F1Size.Width < Edit.Width + Edit.Location.X + 25)
-                    this.Size = new Size(Edit.Width + Edit.Location.X+25, Properties.Settings.Default.F1Size.Height);
-                else
-                    this.Size = Properties.Settings.Default.F1Size; // TODO sort out when this gets screwed 
-                this.Update();
-
-            }
-            SaveExtractedDocs.CheckState = Properties.Settings.Default.SaveDocs ? CheckState.Checked : CheckState.Unchecked;
-            LibraryGen.CheckState = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
-            Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
-            ConvertPCBDoc.Verbose = Verbose.CheckState == CheckState.Checked;
-            string Combo = Properties.Settings.Default.ComboboxItems;
-            PcbNewLocation = Properties.Settings.Default.PcbNewLocation;
-            TextEditorLocation = Properties.Settings.Default.TextEditorLocation;
-
-            string[] items = Combo.Split(';');
-
-            // remove any duplicates
-            var b = new HashSet<string>(items);
-
-            FileHistory.ContextMenu = ComboBoxMenu;
-
-            FileHistory.Items.Clear();
-            FileHistory.Items.AddRange(b.ToArray());
-            if(b.ToArray().Length != items.Length)
-            {
-                // some duplicate items have been removed
-                // so selected index will no longer be valid
-                FileHistory.SelectedIndex = 0;
-            }
-            else
-                FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
-            BackColor = button1.BackColor;
-        }
-
-        private void Form1_Closing(object sender, FormClosingEventArgs e)
-        {
-            if (t != null && t.IsAlive)
-            {
-                t.Abort();
-            }
-            Properties.Settings.Default.F1State = this.WindowState;
-            if (this.WindowState == FormWindowState.Normal)
-            {
-                // save location and size if the state is normal
-                Properties.Settings.Default.F1Location = this.Location;
-                Properties.Settings.Default.F1Size = this.Size;
-            }
-            else
-            {
-                // save the RestoreBounds if the form is minimized or maximized!
-                Properties.Settings.Default.F1Location = this.RestoreBounds.Location;
-                Properties.Settings.Default.F1Size = this.RestoreBounds.Size;
-            }
-            Properties.Settings.Default.SaveDocs = SaveExtractedDocs.CheckState == CheckState.Checked;
-            Properties.Settings.Default.GenLib = LibraryGen.CheckState == CheckState.Checked;
-            Properties.Settings.Default.Verbose = Verbose.CheckState == CheckState.Checked;
-            Properties.Settings.Default.LastFile = FileHistory.Text;
-            Properties.Settings.Default.PcbNewLocation = PcbNewLocation;
-            Properties.Settings.Default.TextEditorLocation = TextEditorLocation;
-            SaveFileHistory();
-            // don't forget to save the settings
-            Properties.Settings.Default.Save();
         }
 
         public bool ControlInvokeRequired(Control c, Action a)
@@ -444,11 +496,11 @@ namespace AtoK
             SelectSource.Update();
             CleanUp.Enabled = true;
             CleanUp.Update();
-            LaunchPCBNew.Enabled = true;
+            LaunchPCBNew.Enabled = (PcbnewLocation!="")?true:false;
             LaunchPCBNew.Update();
             ClearHistory.Enabled = true;
             ClearHistory.Update();
-            Edit.Enabled = false;
+            Edit.Enabled = (TextEditorLoc != "") ? true : false;
             Edit.Update();
         }
 
@@ -492,27 +544,11 @@ namespace AtoK
                     FileHistory.SelectedIndex = 0;
                     FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
                 }
+                SaveFileHistory();
                 FileHistory.SelectedItem = 0;
                 FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
             }
             CheckOutputDir();
-        }
-
-        private void Form1_Resize(object sender, EventArgs e)
-        {
-            this.MinimumSize = new Size(this.Width, 0);
-            this.MaximumSize = new Size(this.Width, Int32.MaxValue);
-            Control control = (Control)sender;
-            // resize the output window 
-            // set top to bottom of button1
-            // set bottom to bottom of form
-            // set left to left of form
-            // set right to right of form
-            control.Width = button1.Right;
-            outputList.Width = this.Width - 35;
-            outputList.Left = FileHistory.Left;
-            outputList.Top = Verbose.Bottom + 10;
-            outputList.Height = control.Height - Verbose.Bottom - 50;
         }
 
         private void Verbose_Click(object sender, EventArgs e)
@@ -523,7 +559,7 @@ namespace AtoK
         private void timer1_Tick(object sender, EventArgs e)
         {
             if (button1.BackColor == Color.Green)
-                button1.BackColor = SystemColors.Control;
+                button1.BackColor = Color.FromArgb(224, 224, 224);
             else
                 button1.BackColor = Color.Green;
             if (t == null || t.IsAlive == false)
@@ -537,8 +573,28 @@ namespace AtoK
                 busy.Hide();
                 Edit.Enabled = true;
                 ClearHistory.Enabled = true;
-                button1.BackColor = SystemColors.Control;
+                button1.BackColor = Color.FromArgb(224, 224, 224);
                 this.Update();
+                if (Globals.ReportLines != 0)
+                {
+                    if (File.Exists(Form1.TextEditorLoc))
+                    {
+                        if (ShowWarnings() == DialogResult.OK)
+                        {
+                            Process p = new Process();
+
+                            p.StartInfo = new ProcessStartInfo(Form1.TextEditorLoc, "\"" + Globals.ReportFilename + "\"");
+                            p.StartInfo.RedirectStandardOutput = false;
+                            p.StartInfo.RedirectStandardError = true;
+                            p.StartInfo.UseShellExecute = false;
+                            p.Start();
+                        }
+                    }
+                    else
+                    {
+                        ConvertPCBDoc.OutputString($"No editor set, warnings can be found in {Globals.ReportFilename}");
+                    }
+                }
             }
             else
             {
@@ -569,9 +625,9 @@ namespace AtoK
                     {
                         try
                         {
-                            if (File.Exists(PcbNewLocation))
+                            if (File.Exists(PcbnewLocation))
                             {
-                                p.StartInfo = new ProcessStartInfo(PcbNewLocation, "\"" + output_filename + "\"");
+                                p.StartInfo = new ProcessStartInfo(PcbnewLocation, "\"" + output_filename + "\"");
                                 p.StartInfo.RedirectStandardOutput = false;
                                 p.StartInfo.RedirectStandardError = true;
                                 p.StartInfo.UseShellExecute = false;
@@ -599,64 +655,49 @@ namespace AtoK
         private void CleanOutput(string filename)
         {
             if (busy != null) busy.Select();
-            ConvertPCBDoc.OutputString("Cleaning Up");
             string CM = (filename.Contains("CMPCBDoc")) ? "-CM" : "";
             string UnpackDirectory = filename.Substring(0, filename.LastIndexOf('.')) + CM + "-Kicad";
             if (Directory.Exists(UnpackDirectory))
             {
                 ConvertPCBDoc.OutputString($"Removing \"{UnpackDirectory}\"'s contents");
                 ConvertPCBDoc.ClearFolder(UnpackDirectory);
-                ConvertPCBDoc.OutputString($"Deleting {UnpackDirectory}");
-                Directory.Delete(UnpackDirectory);
-            }
-            else
-            {
-                ConvertPCBDoc.OutputError($"Output directory \"{UnpackDirectory}\" doesn't exist");
+                ConvertPCBDoc.OutputString($"Deleting \"{UnpackDirectory}\"");
+                try
+                {
+                    Directory.Delete(UnpackDirectory);
+                }
+                catch(Exception Ex)
+                {
+                }
             }
             CheckOutputDir();
         }
 
         private void CleanUpAll()
         {
-            for(var i=0;i< FileHistory.Items.Count; i++)
+            ConvertPCBDoc.OutputString("Removing generated content");
+
+            for (var i=0;i< FileHistory.Items.Count; i++)
             {
                 CleanOutput(FileHistory.GetItemText(FileHistory.Items[i]));
             }
+            ConvertPCBDoc.OutputString("Finished");
             CheckOutputDir();
         }
 
         private void CleanUp_Click(object sender, EventArgs e)
         {
-            busy.Select();
-            this.IsMdiContainer = true;
             CleanUp Clean = new CleanUp();
-            //Clean.MdiParent = this;
+            Clean.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
+            Clean.Location = new System.Drawing.Point((this.Location.X + this.Width / 2) - (Clean.Width / 2), (this.Location.Y + this.Height / 2) - (Clean.Height / 2));
             Clean.ShowDialog();
-            Clean.Focus();
-            switch(CleanFlag)
+            switch (CleanFlag)
             {
                 case CleanEnum.None: break;
                 case CleanEnum.Current: CleanOutput(FileHistory.Text); break;
                 case CleanEnum.All: CleanUpAll();
                     break;
             }
-/*
-            ConvertPCBDoc.OutputString("Cleaning Up");
-            string filename = FileHistory.Text;
-            string CM = (filename.Contains("CMPCBDoc")) ? "-CM" : "";
-            string UnpackDirectory = filename.Substring(0, filename.LastIndexOf('.')) + CM + "-Kicad";
-            if (Directory.Exists(UnpackDirectory))
-            {
-                ConvertPCBDoc.OutputString($"Removing \"{UnpackDirectory}\"'s contents");
-                ConvertPCBDoc.ClearFolder(UnpackDirectory);
-                ConvertPCBDoc.OutputString($"Deleting {UnpackDirectory}");
-                Directory.Delete(UnpackDirectory);
-            }
-            else
-            {
-                ConvertPCBDoc.OutputError("Output directory doesn't exist");
-            }
-            */
         }
 
         private void Edit_Click(object sender, EventArgs e)
@@ -683,9 +724,9 @@ namespace AtoK
                     {
                         try
                         {
-                            if (File.Exists(TextEditorLocation))
+                            if (File.Exists(TextEditorLoc))
                             {
-                                p.StartInfo = new ProcessStartInfo(TextEditorLocation, "\"" + output_filename + "\"");
+                                p.StartInfo = new ProcessStartInfo(TextEditorLoc, "\"" + output_filename + "\"");
                                 p.StartInfo.RedirectStandardOutput = false;
                                 p.StartInfo.RedirectStandardError = true;
                                 p.StartInfo.UseShellExecute = false;
@@ -735,14 +776,20 @@ namespace AtoK
             Properties.Settings.Default.ComboboxItems = Items;
             Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
             Properties.Settings.Default.Save();
+            EnableControls();
 
         }
 
         void CheckOutputDir()
         {
+            if(FileHistory.Text=="")
+            {
+                Edit.Enabled = false;
+                return;
+            }
             string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.LastIndexOf('.')) + "-Kicad";
-            LaunchPCBNew.Enabled = Directory.Exists(UnpackDirectory);
-            Edit.Enabled = Directory.Exists(UnpackDirectory);
+            LaunchPCBNew.Enabled = Directory.Exists(UnpackDirectory) && PcbnewLocation != "";
+            Edit.Enabled = Directory.Exists(UnpackDirectory) && TextEditorLoc != "";
         }
 
         private void FileHistory_SelectedIndexChanged(object sender, EventArgs e)
@@ -787,16 +834,26 @@ namespace AtoK
             busy.Select();
             FileHistory.Items.Clear();
             FileHistory.ResetText();
-            FileHistory.Items.Insert(0, FileHistory.Text);
-            FileHistory.SelectedIndex = 0;
+//            FileHistory.Items.Insert(0, FileHistory.Text);
+            FileHistory.SelectedIndex = -1;
+            SaveFileHistory();
         }
 
         private void Options_Click(object sender, EventArgs e)
         {
             var OptionsForm = new Options();
             OptionsForm.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
-            OptionsForm.Location = new System.Drawing.Point((Form1.ActiveForm.Location.X + Form1.ActiveForm.Width / 2) - (OptionsForm.Width / 2), (Form1.ActiveForm.Location.Y + Form1.ActiveForm.Height / 2) - (OptionsForm.Height / 2));
-            OptionsForm.Show();
+            OptionsForm.Location = new System.Drawing.Point((this.Location.X + this.Width / 2) - (OptionsForm.Width / 2), (this.Location.Y + this.Height / 2) - (OptionsForm.Height / 2));
+            OptionsForm.ShowDialog();
+            EnableControls();
+        }
+
+        public DialogResult ShowWarnings()
+        {
+            var Form = new Warnings();
+            Form.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
+            Form.Location = new System.Drawing.Point((this.Location.X + this.Width / 2) - (Form.Width / 2), (this.Location.Y + this.Height / 2) - (Form.Height / 2));
+            return Form.ShowDialog();
         }
 
         private void outputList_KeyPress(object sender, KeyPressEventArgs e)

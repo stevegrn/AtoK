@@ -9,9 +9,16 @@ using System.Runtime.InteropServices;
 using System.Text;
 using AtoK;
 using System.Threading;
+using System.Windows.Forms;
+using System.Drawing;
 
 namespace ConvertToKicad
 {
+    public static class Globals
+    {
+        static public string ReportFilename;
+        static public int ReportLines;
+    }
 
     public partial class ConvertPCBDoc
     {
@@ -22,8 +29,8 @@ namespace ConvertToKicad
         static UInt32 track_count = 0;
         static StringBuilder texts;
         static StringBuilder arcs;
-        static string fills = "";
-        static string keepouts = "";
+        static StringBuilder fills;
+        static StringBuilder keepouts;
         public static bool ExtractFiles = false;
         public static bool CreateLib = false;
         public static bool Verbose = false;
@@ -34,21 +41,22 @@ namespace ConvertToKicad
         public static string output_filename = "";
         static char[] charsToTrim = { 'm', 'i', 'l' };
         static FileVersionInfo FV;
-        static ObjectList<Net> NetsL;
-        static ObjectList<Module> ModulesL;
-        static ObjectList<Polygon> PolygonsL;
-        static ObjectList<Line> LinesL;
-        static ObjectList<Pad> PadsL;
-        static ObjectList<String> Strings;
-        static ObjectList<Via> ViasL;
-        static ObjectList<Fill> FillsL;
+        static ObjectList<Net>       NetsL;
+        static ObjectList<Module>    ModulesL;
+        static ObjectList<Polygon>   PolygonsL;
+        static ObjectList<Line>      LinesL;
+        static ObjectList<Pad>       PadsL;
+        static ObjectList<String>    Strings;
+        static ObjectList<Via>       ViasL;
+        static ObjectList<Fill>      FillsL;
         static ObjectList<Dimension> DimensionsL;
-        static ObjectList<Rule> RulesL;
-        static ObjectList<Region> RegionsL;
-        static ObjectList<Line> Segments;
+        static ObjectList<Rule>      RulesL;
+        static ObjectList<Region>    RegionsL;
+        static ObjectList<Line>      Segments;
         static Stopwatch StopWatch;
         static double originX = 0;
         static double originY = 0;
+        static StreamWriter ReportFile;
 
         static void CheckThreadAbort(Exception Ex)
         {
@@ -765,19 +773,40 @@ namespace ConvertToKicad
 
         static void ProcessPcbObject(CompoundFile cf, PcbDocEntry Object)
         {
-            OutputString("Processing " + Object.FileName);
             CFStorage storage=null;
             CMFile = false;
             if (!CMFile)
             {
-                storage = cf.RootStorage.TryGetStorage(Object.FileName);
-                if (storage == null)
+                // try normal directory name
+                if ((storage = cf.RootStorage.TryGetStorage(Object.FileName)) != null)
                 {
-                    // couldn't find normal filename try to see if CM file exists
-                    storage = cf.RootStorage.TryGetStorage(Object.CMFileName);
-                    if (storage == null)
+                    OutputString($"Processing {Object.FileName}");
+                }
+                else
+                // try CM type directory name
+                if ((storage = cf.RootStorage.TryGetStorage(Object.CMFileName)) != null)
+                {
+                    OutputString($"Processing {Object.FileName} aliased as {Object.CMFileName}");
+                }
+                else
+                {
+                    // try version 5 directory name
+                    if (Object.FileName[Object.FileName.Length - 1] == '6')
                     {
-                        OutputString($"Didn't find '{Object.FileName}'");
+                        filename = Object.FileName.Substring(0, Object.FileName.Length - 1);
+                        if ((storage = cf.RootStorage.TryGetStorage(filename)) != null)
+                        {
+                            OutputString($"Processing {filename}");
+                        }
+                        else
+                        {
+                            OutputString($"Didn't find '{Object.FileName}' or any other candidates");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        OutputString($"Didn't find '{Object.FileName}' or any other candidates");
                         return;
                     }
                 }
@@ -883,23 +912,46 @@ namespace ConvertToKicad
             {
                 DirectoryInfo dir = new DirectoryInfo(FolderName);
 
+                // delete any files
                 foreach (FileInfo fi in dir.GetFiles())
                 {
                     try
                     {
                         fi.Delete();
+                        fi.Refresh();
+                        // sometimes needs time for file to be deleted
+                        while (fi.Exists)
+                        {
+                            System.Threading.Thread.Sleep(100);
+                            fi.Refresh();
+                        }
                     }
                     catch(IOException Ex)
                     {
-                        OutputError($"Couldn't delete {fi.Name}");
+                        OutputError($"Couldn't delete {FolderName}\\{fi.Name}");
                     }
                 }
 
+                // delete any subdirectories
                 foreach (DirectoryInfo di in dir.GetDirectories())
                 {
                     // recurse
                     ClearFolder(di.FullName);
-                    di.Delete();
+                    try
+                    {
+                        di.Delete();
+                        di.Refresh();
+                        // sometimes needs time for file to be deleted
+                        while (di.Exists)
+                        {
+                            System.Threading.Thread.Sleep(100);
+                            di.Refresh();
+                        }
+                    }
+                    catch (IOException Ex)
+                    {
+                        OutputError($"Couldn't delete {di.FullName}", true);
+                    }
                 }
             }
             catch (Exception Ex)
@@ -934,6 +986,26 @@ namespace ConvertToKicad
             }
             else
             {
+                Globals.ReportLines++;
+                if(ConvertRunning && ReportFile != null)
+                    ReportFile.WriteLine(text);
+                else
+                {
+                    Program.Form.outputList_Add(text, System.Drawing.Color.Red);
+                    Program.Form.outputList_Update();
+                }
+            }
+        }
+
+        public static void OutputError(string text, bool Screen)
+        {
+            // always error text
+            if (Program.ConsoleApp)
+            {
+                Console.Error.WriteLine(text);
+            }
+            else
+            {
                 Program.Form.outputList_Add(text, System.Drawing.Color.Red);
                 Program.Form.outputList_Update();
             }
@@ -949,14 +1021,14 @@ namespace ConvertToKicad
 
         public unsafe void ConvertFile(string FileName, bool extractFiles, bool createLib)
         {
-            ConvertRunning = true;
             net_classes = "";
-            tracks = new StringBuilder("");
-            texts = new StringBuilder("");
-            arcs = new StringBuilder("");
-            fills = "";
-            keepouts = "";
+            tracks      = new StringBuilder("");
+            texts       = new StringBuilder("");
+            arcs        = new StringBuilder("");
+            fills       = new StringBuilder("");
+            keepouts    = new StringBuilder("");
             StopWatch = new Stopwatch();
+            Globals.ReportLines = 0;
 
             StopWatch.Start();
             try
@@ -1009,7 +1081,7 @@ namespace ConvertToKicad
                     CMFile = true;
                 }
 
-                if(Extension == "")
+                if (Extension == "")
                 {
                     OutputError($"File {filename} should end in '.pcbdoc' or '.cmpcbdoc'");
                     System.Environment.Exit(0);
@@ -1024,13 +1096,29 @@ namespace ConvertToKicad
                 }
 
                 //if (filename.Substring(index, filename.Length - index).ToLower() != ".pcbdoc")
-                if(Extension == "")
+                if (Extension == "")
                 {
                     OutputError($"File {filename} is not valid pcb file");
                     System.Environment.Exit(0);
                 }
 
+                CompoundFile cf = new CompoundFile(filename);
+
                 FV = new FileVersionInfo("FileVersionInfo", "38434311D9D84DCDB403436D1149A8", "", Type.text, 4);
+                CFStorage storage = cf.RootStorage.TryGetStorage(FV.FileName);
+                if (storage == null)
+                {
+                    storage = cf.RootStorage.TryGetStorage(FV.CMFileName);
+                    if (storage == null)
+                    {
+
+                    //    OutputError("Unsupported file format...Pre Winter09 file");
+                        Globals.ReportLines = 0;
+                    //    return;
+                    }
+                }
+
+                ConvertRunning = true;
 
                 // Initialise the PcbObjects list
                 PcbObjects = new List<PcbDocEntry>
@@ -1074,10 +1162,9 @@ namespace ConvertToKicad
                 // Boards6 is processed first so will have layer stack set up in it
                 Brd = (Board)PcbObjects[1];
 
-                CompoundFile cf = new CompoundFile(filename);
                 if (filename.Contains("CMPCBDoc"))
                 {
-//                    CMConvert(cf);
+                    //                    CMConvert(cf); // descramble file names
                 }
                 OutputString($"Converting {filename}");
                 string CM = (filename.Contains("CMPCBDoc")) ? "-CM" : "";
@@ -1089,12 +1176,15 @@ namespace ConvertToKicad
                     Directory.CreateDirectory(UnpackDirectory);
                 }
 
+                ReportFile = null;
                 // clear out the directory
                 ClearFolder(UnpackDirectory);
 
                 // change to the directory
                 Directory.SetCurrentDirectory(UnpackDirectory);
                 string cd = Directory.GetCurrentDirectory();
+                Globals.ReportFilename = cd + "\\Report.txt";
+                ReportFile = File.CreateText("Report.txt");
 
                 IList<IDirectoryEntry> entries = cf.GetDirectories();
                 if (MakeDir(cf.RootStorage.Name))
@@ -1143,7 +1233,7 @@ namespace ConvertToKicad
                     OutputString("Removing extracted files");
                 }
 
-                output_filename = filename;
+                output_filename = FileName;
                 int idx = output_filename.LastIndexOf('\\');
                 if (idx == -1)
                     idx = 0;
@@ -1152,11 +1242,11 @@ namespace ConvertToKicad
 
                 output_filename = output_filename.Substring(idx, output_filename.Length - idx);
 
-                index = output_filename.LastIndexOf('.');
-                output_filename = output_filename.Substring(0, index) + ".kicad_pcb";
-
-                OutputString("Outputting Kicad PCB file");
-                System.IO.StreamWriter OutFile = new System.IO.StreamWriter(output_filename);
+                idx = output_filename.LastIndexOf('.');
+                if(idx!=-1)
+                    output_filename = output_filename.Substring(0, idx) + ".kicad_pcb";
+                OutputString($"Outputting Kicad PCB file {UnpackDirectory}\\{output_filename}");
+                System.IO.StreamWriter OutFile = new System.IO.StreamWriter(UnpackDirectory + "\\" + output_filename);
 
                 // TODO find extremes of pcb to select correct page size
                 {
@@ -1265,8 +1355,8 @@ namespace ConvertToKicad
                 OutFile.WriteLine(tracks.ToString());
                 OutFile.WriteLine(arcs.ToString());
                 OutFile.WriteLine(texts.ToString());
-                OutFile.WriteLine(fills);
-                OutFile.WriteLine(keepouts);
+                OutFile.WriteLine(fills.ToString());
+                OutFile.WriteLine(keepouts.ToString());
                 OutFile.WriteLine(DimensionsL.ToString());
                 OutFile.WriteLine(RegionsL.ToString());
                 OutFile.WriteLine(")");
@@ -1317,7 +1407,7 @@ namespace ConvertToKicad
                                     InvalidFilename = true;
                                 }
                             }
-                            if(InvalidFilename)
+                            if (InvalidFilename)
                             {
                                 OutputError($"Invalid filename {Mod.Name}.kicad_mod changed to {fileName}");
                             }
@@ -1341,6 +1431,7 @@ namespace ConvertToKicad
                     }
                 }
                 cf.Close();
+                ReportFile.Close();
                 Directory.SetCurrentDirectory("..\\");
                 OutputString($"Finished time taken = {GetTimeString(StopWatch.ElapsedMilliseconds)}");
             }

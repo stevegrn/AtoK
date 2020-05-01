@@ -30,8 +30,10 @@
         {
             this.PcbNew = new System.Windows.Forms.Button();
             this.TextEditor = new System.Windows.Forms.Button();
-            this.PcbNewLocation = new System.Windows.Forms.ListBox();
+            this.PcbnewLocation = new System.Windows.Forms.ListBox();
             this.TextEditorLocation = new System.Windows.Forms.ListBox();
+            this.OK = new System.Windows.Forms.Button();
+            this.CANCEL = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // PcbNew
@@ -40,7 +42,7 @@
             this.PcbNew.Name = "PcbNew";
             this.PcbNew.Size = new System.Drawing.Size(110, 23);
             this.PcbNew.TabIndex = 0;
-            this.PcbNew.Text = "PcbNew Location";
+            this.PcbNew.Text = "Pcbnew Location";
             this.PcbNew.UseVisualStyleBackColor = true;
             this.PcbNew.Click += new System.EventHandler(this.PcbNew_Click);
             // 
@@ -54,13 +56,14 @@
             this.TextEditor.UseVisualStyleBackColor = true;
             this.TextEditor.Click += new System.EventHandler(this.TextEditor_Click);
             // 
-            // PcbNewLocation
+            // PcbnewLocation
             // 
-            this.PcbNewLocation.FormattingEnabled = true;
-            this.PcbNewLocation.Location = new System.Drawing.Point(182, 27);
-            this.PcbNewLocation.Name = "PcbNewLocation";
-            this.PcbNewLocation.Size = new System.Drawing.Size(295, 17);
-            this.PcbNewLocation.TabIndex = 2;
+            this.PcbnewLocation.FormattingEnabled = true;
+            this.PcbnewLocation.Location = new System.Drawing.Point(182, 27);
+            this.PcbnewLocation.Name = "PcbnewLocation";
+            this.PcbnewLocation.Size = new System.Drawing.Size(295, 17);
+            this.PcbnewLocation.TabIndex = 2;
+            this.PcbnewLocation.KeyDown += new System.Windows.Forms.KeyEventHandler(this.PcbnewLocation_KeyDown);
             // 
             // TextEditorLocation
             // 
@@ -69,14 +72,41 @@
             this.TextEditorLocation.Name = "TextEditorLocation";
             this.TextEditorLocation.Size = new System.Drawing.Size(295, 17);
             this.TextEditorLocation.TabIndex = 3;
+            this.TextEditorLocation.KeyDown += new System.Windows.Forms.KeyEventHandler(this.TextEditorLocation_KeyDown);
+            this.TextEditorLocation.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.TextEditorLocation_KeyPress);
+            // 
+            // OK
+            // 
+            this.OK.Location = new System.Drawing.Point(105, 118);
+            this.OK.Name = "OK";
+            this.OK.Size = new System.Drawing.Size(110, 26);
+            this.OK.TabIndex = 4;
+            this.OK.Text = "OK";
+            this.OK.UseVisualStyleBackColor = true;
+            this.OK.Click += new System.EventHandler(this.OK_Click);
+            // 
+            // CANCEL
+            // 
+            this.CANCEL.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.CANCEL.Location = new System.Drawing.Point(284, 118);
+            this.CANCEL.Name = "CANCEL";
+            this.CANCEL.Size = new System.Drawing.Size(110, 26);
+            this.CANCEL.TabIndex = 5;
+            this.CANCEL.Text = "CANCEL";
+            this.CANCEL.UseVisualStyleBackColor = true;
+            this.CANCEL.Click += new System.EventHandler(this.CANCEL_Click);
             // 
             // Options
             // 
+            this.AcceptButton = this.OK;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(498, 121);
+            this.CancelButton = this.CANCEL;
+            this.ClientSize = new System.Drawing.Size(498, 175);
+            this.Controls.Add(this.CANCEL);
+            this.Controls.Add(this.OK);
             this.Controls.Add(this.TextEditorLocation);
-            this.Controls.Add(this.PcbNewLocation);
+            this.Controls.Add(this.PcbnewLocation);
             this.Controls.Add(this.TextEditor);
             this.Controls.Add(this.PcbNew);
             this.Name = "Options";
@@ -92,7 +122,9 @@
 
         private System.Windows.Forms.Button PcbNew;
         private System.Windows.Forms.Button TextEditor;
-        private System.Windows.Forms.ListBox PcbNewLocation;
+        private System.Windows.Forms.ListBox PcbnewLocation;
         private System.Windows.Forms.ListBox TextEditorLocation;
+        private System.Windows.Forms.Button OK;
+        private System.Windows.Forms.Button CANCEL;
     }
 }

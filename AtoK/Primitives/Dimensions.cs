@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Text;
+using System.Collections.Generic;
 
 namespace ConvertToKicad
 {
@@ -206,46 +208,34 @@ namespace ConvertToKicad
 
                 text = $"\"{length}mm\"";
 
-                string string1 = $@"
-    (dimension 176 (width {LINEWIDTH}) (layer {layer})
-      (gr_text {text} (at {TEXT1X} {-TEXT1Y} {ANGLE}) (layer {layer})
-          (effects (font (size {Math.Round(TEXTHEIGHT, Precision)} {Math.Round(TEXTHEIGHT, Precision)}) (thickness {Math.Round(LINEWIDTH, Precision)})) (justify left ))
-      )
-      (feature1 (pts (xy {end.X} {-end.Y}) (xy {R1.X} {-R1.Y})  ))
-      (feature2 (pts  (xy {X1} {-Y1}) (xy {R0.X} {-R0.Y})))
-      (crossbar (pts (xy {X1} {-Y1}) (xy {end.X} {-end.Y})))
-      (arrow1a  (pts (xy {X1} {-Y1}) (xy {a1a.X} {-a1a.Y})))
-      (arrow1b  (pts (xy {X1} {-Y1}) (xy {a1b.X} {-a1b.Y})))
-      (arrow2a  (pts (xy {end.X} {-end.Y}) (xy {a2a.X} {-a2a.Y})))
-      (arrow2b  (pts (xy {end.X} {-end.Y}) (xy {a2b.X} {-a2b.Y})))
-    )";
-                // debug string to show with pads the X1,Y1 point and the REF0 and REF1 points
-                string string2 = $@"
-        (net 0 """")
-        (net 1 ""X1"")
-        (net 2 ""X2"")
-        (net 3 ""REF0"")
-        (net 4 ""REF1"")
-        (net 5 ""LX"")
-        (net 6 ""HX"")
-        (net 7 ""TEXTX"")
-        (net 8 ""TEXT1X"")
-
-            (module ""PAD"" (layer F.Cu) (tedit 0) (tstamp 0)
-              (at {X1} {-Y1} 0)
-              (pad 0 smd circle (at 0 0 0) (size 0.9 0.8) (drill 0) (layers F.Cu)(net 1 ""X1"")(zone_connect 1))
-            )
-
-            (module ""PAD"" (layer F.Cu) (tedit 0) (tstamp 0)
-              (at {REFERENCE0POINTX} {-REFERENCE0POINTY} 0)
-              (pad 0 smd circle (at 0 0 0) (size 0.9 0.8) (drill 0) (layers F.Cu)(net 3 ""REF0"")(zone_connect 1))
-            )
-            (module ""PAD"" (layer F.Cu) (tedit 0) (tstamp 0)
-              (at {REFERENCE1POINTX} {-REFERENCE1POINTY} 0)
-              (pad 0 smd circle (at 0 0 0) (size 0.9 0.8) (drill 0) (layers F.Cu)(net 4 ""REF1"")(zone_connect 1))
-            )
-        ";
-                return string1; //+string2;
+                StringBuilder string1 = new StringBuilder("");
+                List<string> Layers = new List<string>();
+                if (layer == "*.Cu")
+                {
+                    foreach (var L in Brd.OrderedLayers)
+                    {
+                        Layers.Add(L.PcbNewLayer);
+                    }
+                }
+                else
+                    Layers.Add(layer);
+                foreach (var L in Layers)
+                {
+                    string1.Append($@"
+  (dimension 176 (width {LINEWIDTH}) (layer {L})
+    (gr_text {text} (at {TEXT1X} {-TEXT1Y} {ANGLE}) (layer {L.ToString()})
+        (effects (font (size {Math.Round(TEXTHEIGHT, Precision)} {Math.Round(TEXTHEIGHT, Precision)}) (thickness {Math.Round(LINEWIDTH, Precision)})) (justify left ))
+    )
+    (feature1 (pts (xy {end.X} {-end.Y}) (xy {R1.X} {-R1.Y})  ))
+    (feature2 (pts  (xy {X1} {-Y1}) (xy {R0.X} {-R0.Y})))
+    (crossbar (pts (xy {X1} {-Y1}) (xy {end.X} {-end.Y})))
+    (arrow1a  (pts (xy {X1} {-Y1}) (xy {a1a.X} {-a1a.Y})))
+    (arrow1b  (pts (xy {X1} {-Y1}) (xy {a1b.X} {-a1b.Y})))
+    (arrow2a  (pts (xy {end.X} {-end.Y}) (xy {a2a.X} {-a2a.Y})))
+    (arrow2b  (pts (xy {end.X} {-end.Y}) (xy {a2b.X} {-a2b.Y})))
+  )");
+                }
+                return string1.ToString() ;
             }
         }
 

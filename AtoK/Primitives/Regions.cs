@@ -32,16 +32,16 @@ namespace ConvertToKicad
 
             }
 
-            public Region(string layer, int net, Int16 flags)
+            public Region(string layer, int net, Int16 flags, string line)
             {
                 Layer = layer;
                 Net_no = net;
                 Net_name = GetNetName(Net_no);
                 Points = new List<Point>();
                 Flags = flags;
-                bool Keepout       = (Flags & 0x200) == 0x200;
-                bool PolygonCutout = (Flags & 4) == 4;
-                bool BoardCutout   = (Flags & 1) == 1;
+                Keepout = layer == "keepout";
+                PolygonCutout = (ConvertPCBDoc.GetString(line, "|KIND=") == "1");
+                BoardCutout   = (ConvertPCBDoc.GetString(line, "|ISBOARDCUTOUT=") == "TRUE");
                 if (BoardCutout)
                     Layer = "Edge.Cuts";
             }
@@ -58,30 +58,41 @@ namespace ConvertToKicad
                     clearance = GetRuleValue("PlaneClearance", "PlaneClearance");
                 }
 
-                //        if (!Keepout)
-                //            Layer = "Dwgs.User";
                 if (Layer != "Edge.Cuts")
                 {
-                    ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)");
-                    ret.Append($"    (priority 100)\n");
-                    ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
-                    ret.Append($"    (min_thickness 0.2)\n");
-                    if (Keepout)
-                        ret.Append("(keepout(copperpour not_allowed))\n");
-                    else if (PolygonCutout)
-                        ret.Append("(keepout (tracks not_allowed) (vias allowed) (copperpour not_allowed))");
-                    string fill = (Layer == "Edge.Cuts") ? "no" : "yes";
-                    ret.Append($"    (fill {fill} (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n");
-                    var i = 0;
-                    ret.Append("    (polygon (pts\n        ");
-                    foreach (var Point in Points)
+                    List<string> Layers = new List<string>();
+                    if (Layer == "*.Cu")
                     {
-                        i++;
-                        if ((i % 5) == 0)
-                            ret.Append("\n        ");
-                        ret.Append(Point.ToString());
+                        foreach (var L in Brd.OrderedLayers)
+                        {
+                            Layers.Add(L.PcbNewLayer);
+                        }
                     }
-                    ret.Append("\n      )\n    )\n  )\n");
+                    else
+                        Layers.Add(Layer);
+                    foreach (var L in Layers)
+                    {
+                        ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {L}) (tstamp 0) (hatch edge 0.508)");
+                        ret.Append($"    (priority 100)\n");
+                        ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
+                        ret.Append($"    (min_thickness 0.2)\n");
+                        if (Keepout)
+                            ret.Append("(keepout(copperpour not_allowed))\n");
+                        else if (PolygonCutout)
+                            ret.Append("(keepout (tracks not_allowed) (vias allowed) (copperpour not_allowed))");
+                        string fill = (Layer == "Edge.Cuts") ? "no" : "yes";
+                        ret.Append($"    (fill {fill} (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n");
+                        var i = 0;
+                        ret.Append("    (polygon (pts\n        ");
+                        foreach (var Point in Points)
+                        {
+                            i++;
+                            if ((i % 5) == 0)
+                                ret.Append("\n        ");
+                            ret.Append(Point.ToString());
+                        }
+                        ret.Append("\n      )\n    )\n  )\n");
+                    }
                 }
                 else
                 {
@@ -103,6 +114,7 @@ namespace ConvertToKicad
             {
                 // not allowed so just return
                 return "";
+/*
                 StringBuilder ret = new StringBuilder("");
 
                 double clearance = GetRuleValue("Clearance", "PolygonClearance");
@@ -134,7 +146,7 @@ namespace ConvertToKicad
                 }
                 ret.Append("\n      )\n    )\n  )\n");
                 
-/*                ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)");
+                ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)");
                 ret.Append($"    (priority 100)\n");
                 ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
                 ret.Append($"    (min_thickness 0.2)\n");
@@ -151,8 +163,9 @@ namespace ConvertToKicad
                 }
                 //                ret += "\n      )\n    )\n  )\n";
                 ret.Append($" ) ( layer {Brd.GetLayer(Layer)}) (width 0)\n    )\n");
-*/
+
                 return ret.ToString();
+*/
             }
         }
 
@@ -216,14 +229,11 @@ namespace ConvertToKicad
                             ms.Seek(0x16 + strlen, SeekOrigin.Begin);
                             Int32 DataLen = br.ReadInt32();
                             string l = Brd.GetLayer((Layers)Layer);
-                            Region r = new Region(l, net, Flags);
-
+                            Region r = new Region(l, net, Flags, str);
                             while (DataLen-- > 0)
                             {
                                 double X = Math.Round(ToMM(br.ReadDouble()) - originX, Precision);
                                 double Y = Math.Round(ToMM(br.ReadDouble()) - originY, Precision);
-                                if (X > 10000 || Y > 10000 || Y<0)  // TODO sort out this frig these come from second Regions append
-                                    return false;
                                 r.AddPoint(X, Y);
                             }
 

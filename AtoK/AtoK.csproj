@@ -168,6 +168,12 @@
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
     <Compile Include="Settings.cs" />
+    <Compile Include="Warnings.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Warnings.Designer.cs">
+      <DependentUpon>Warnings.cs</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="AlertForm.resx">
@@ -183,6 +189,9 @@
       <DependentUpon>Options.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx" />
+    <EmbeddedResource Include="Warnings.resx">
+      <DependentUpon>Warnings.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">

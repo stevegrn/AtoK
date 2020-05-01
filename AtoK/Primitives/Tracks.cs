@@ -107,9 +107,9 @@ namespace ConvertToKicad
                     ComponentNumber = component;
                 }
                 // check for and reject very short tracks
-                if (Length(X1, Y1, X2, Y2) <= 0.001) //(Math.Abs(X1 - X2) < 0.001) && (Math.Abs(Y1 - Y2) < 0.001))
+                if (Length(X1, Y1, X2, Y2) <= 0.001)
                 {
-                    OutputError($"Zero length track rejected at X1={X1} Y1={Y1} X2={X2} y2={Y2} ");
+                    OutputError($"Zero length track rejected at X1={X1} Y1={-Y1} X2={X2} y2={-Y2} ");
                     return true;
                 }
                 if (!InComponent)
@@ -120,15 +120,27 @@ namespace ConvertToKicad
                         {
                             if ((Layer != "Edge.Cuts") || !Brd.CheckExistingLine(X1, -Y1, X2, -Y2))
                             {
-                                tracks.Append($"  (gr_line (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}))\n");
-                                track_count++;
+                                List<string> Layers = new List<string>();
+                                if (Layer == "*.Cu")
+                                {
+                                    foreach (var L in Brd.OrderedLayers)
+                                    {
+                                        Layers.Add(L.PcbNewLayer);
+                                    }
+                                }
+                                else
+                                    Layers.Add(Layer);
+                                foreach (var L in Layers)
+                                {
+                                    tracks.Append($"  (gr_line (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {L}))\n");
+                                    track_count++;
+                                }                              
                             }
                         }
                     }
                     else
                     {
                         Line Line = new Line(X1, Y1, X2, Y2, layer, width, true);
-                       // Segments.Add(Line);
                         tracks.Append($"  (segment (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}) (net {net}))\n");
                         track_count++;
                     }

@@ -170,12 +170,12 @@ namespace AtoK.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
-        public string PcbNewLocation {
+        public string PcbnewLocation {
             get {
-                return ((string)(this["PcbNewLocation"]));
+                return ((string)(this["PcbnewLocation"]));
             }
             set {
-                this["PcbNewLocation"] = value;
+                this["PcbnewLocation"] = value;
             }
         }
         
