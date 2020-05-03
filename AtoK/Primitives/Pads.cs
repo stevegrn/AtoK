@@ -607,7 +607,7 @@ namespace ConvertToKicad
                         {
                             CheckThreadAbort(Ex);
                         }
-                        if(GenerateTxtFile)
+                        if(GenerateTxtFile && TextFile != null)
                             TextFile.Close();
                     }
                 }
