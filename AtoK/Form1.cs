@@ -10,6 +10,8 @@ using System.Linq;
 using ConvertToKicad;
 using System.Diagnostics;
 using System.Text;
+using System.Reflection;
+using Ionic.Zlib;
 
 namespace AtoK
 {
@@ -63,6 +65,19 @@ namespace AtoK
 
         public Form1()
         {
+            AppDomain.CurrentDomain.AssemblyResolve += (sender, args) =>
+            {
+                string resourceName = new AssemblyName(args.Name).Name + ".dll";
+                string resource = Array.Find(this.GetType().Assembly.GetManifestResourceNames(), element => element.EndsWith(resourceName));
+
+                using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource))
+                {
+                    Byte[] assemblyData = new Byte[stream.Length];
+                    stream.Read(assemblyData, 0, assemblyData.Length);
+                    return Assembly.Load(assemblyData);
+                }
+            };
+
             Screen scrn = Screen.FromControl(this);
 
             InitializeComponent();
@@ -88,6 +103,11 @@ namespace AtoK
             Properties.Settings.Default.Save();
             PcbnewLocation = "";
             TextEditorLoc = "";
+        }
+
+        private void LinkIonicZlib()
+        {
+            Ionic.Zlib.CompressionLevel x;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -482,6 +502,10 @@ namespace AtoK
 
         public void EnableControls()
         {
+            SaveExtractedDocs.CheckState = Properties.Settings.Default.SaveDocs ? CheckState.Checked : CheckState.Unchecked;
+            LibraryGen.CheckState = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
+            Verbose.CheckState = Properties.Settings.Default.Verbose ? CheckState.Checked : CheckState.Unchecked;
+
             LibraryGen.Enabled = true;
             LibraryGen.Update();
             SaveExtractedDocs.Enabled = true;
@@ -496,12 +520,12 @@ namespace AtoK
             SelectSource.Update();
             CleanUp.Enabled = true;
             CleanUp.Update();
-            LaunchPCBNew.Enabled = (PcbnewLocation!="")?true:false;
+            LaunchPCBNew.Enabled = (PcbnewLocation!="" && FileHistory.Items.Count != 0)?true:false;
             LaunchPCBNew.Update();
-            ClearHistory.Enabled = true;
-            ClearHistory.Update();
-            Edit.Enabled = (TextEditorLoc != "") ? true : false;
+            Edit.Enabled = (TextEditorLoc != "" && FileHistory.Items.Count != 0) ? true : false;
             Edit.Update();
+            ClearHistory.Enabled = FileHistory.Items.Count != 0;
+            ClearHistory.Update();
         }
 
         private void SelectSource_Click(object sender, EventArgs e)
@@ -571,8 +595,6 @@ namespace AtoK
                 busy.Enabled = false;
                 busy.Visible = false;
                 busy.Hide();
-                Edit.Enabled = true;
-                ClearHistory.Enabled = true;
                 button1.BackColor = Color.FromArgb(224, 224, 224);
                 this.Update();
                 if (Globals.ReportLines != 0)
@@ -806,7 +828,7 @@ namespace AtoK
             {
                 //Remove the listitem from the combobox list
                 FileHistory.Items.RemoveAt(FileHistory.SelectedIndex);
-                if(FileHistory.SelectedIndex < 0 || FileHistory.SelectedIndex > FileHistory.Items.Count)
+                if(FileHistory.SelectedIndex > FileHistory.Items.Count)
                 {
                     FileHistory.SelectedIndex = 0;
                 }

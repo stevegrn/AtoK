@@ -67,9 +67,10 @@
     <StartupObject>AtoK.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Ionic.Zlib">
-      <HintPath>.\Ionic.Zlib.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="Ionic.Zlib, Version=1.9.1.8, Culture=neutral, PublicKeyToken=edbe51ad942a3f5c, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>Lib\Ionic.Zlib.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -201,6 +202,7 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Lib\Ionic.Zlib.dll" />
     <Content Include="OpenMcdf\OpenMcdf.csproj" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSHARP.Targets" />
@@ -208,6 +210,8 @@
     <VisualStudio AllowExistingFolder="true" />
   </ProjectExtensions>
   <PropertyGroup>
-    <PostBuildEvent>copy "$(TargetDir)AtoK.exe" "$(ProjectDir)..\AtoKBinary\"</PostBuildEvent>
+    <PostBuildEvent>copy "$(TargetDir)AtoK.exe" "$(ProjectDir)..\AtoKBinary\"
+
+</PostBuildEvent>
   </PropertyGroup>
 </Project>
