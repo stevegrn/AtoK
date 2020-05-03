@@ -60,16 +60,7 @@ namespace ConvertToKicad
 
                 if (Layer != "Edge.Cuts")
                 {
-                    List<string> Layers = new List<string>();
-                    if (Layer == "*.Cu")
-                    {
-                        foreach (var L in Brd.OrderedLayers)
-                        {
-                            Layers.Add(L.PcbNewLayer);
-                        }
-                    }
-                    else
-                        Layers.Add(Layer);
+                    List<string> Layers = Brd.GetLayers(Layer);
                     foreach (var L in Layers)
                     {
                         ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {L}) (tstamp 0) (hatch edge 0.508)");

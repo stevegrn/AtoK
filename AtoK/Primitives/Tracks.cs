@@ -120,16 +120,7 @@ namespace ConvertToKicad
                         {
                             if ((Layer != "Edge.Cuts") || !Brd.CheckExistingLine(X1, -Y1, X2, -Y2))
                             {
-                                List<string> Layers = new List<string>();
-                                if (Layer == "*.Cu")
-                                {
-                                    foreach (var L in Brd.OrderedLayers)
-                                    {
-                                        Layers.Add(L.PcbNewLayer);
-                                    }
-                                }
-                                else
-                                    Layers.Add(Layer);
+                                List<string> Layers = Brd.GetLayers(Layer);
                                 foreach (var L in Layers)
                                 {
                                     tracks.Append($"  (gr_line (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {L}))\n");

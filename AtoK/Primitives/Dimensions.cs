@@ -209,16 +209,7 @@ namespace ConvertToKicad
                 text = $"\"{length}mm\"";
 
                 StringBuilder string1 = new StringBuilder("");
-                List<string> Layers = new List<string>();
-                if (layer == "*.Cu")
-                {
-                    foreach (var L in Brd.OrderedLayers)
-                    {
-                        Layers.Add(L.PcbNewLayer);
-                    }
-                }
-                else
-                    Layers.Add(layer);
+                List<string> Layers = Brd.GetLayers(Brd.GetLayer(layer));
                 foreach (var L in Layers)
                 {
                     string1.Append($@"

@@ -143,16 +143,7 @@ namespace ConvertToKicad
                             layer = "*.Cu";
                         else
                             layer = Brd.GetLayer(Layer);
-                        List<string> layers = new List<string>();
-                        if (layer == "*.Cu")
-                        {
-                            foreach (var L in Brd.OrderedLayers)
-                            {
-                                layers.Add(L.PcbNewLayer);
-                            }
-                        }
-                        else
-                            layers.Add(layer);
+                        List<string> layers = Brd.GetLayers(layer);
                         foreach (var L in layers)
                         {
                             // generate a keepout
@@ -175,18 +166,8 @@ $@"
                     }
                     else if (!InComponent) // keepouts not allowed in components (yet)
                     {
-                        string layer = Brd.GetLayer(Layer);
-                        List<string> layers = new List<string>();
-                        if (layer == "*.Cu")
-                        {
-                            foreach (var L in Brd.OrderedLayers)
-                            {
-                                layers.Add(L.PcbNewLayer);
-                            }
-                        }
-                        else
-                            layers.Add(layer);
-                        foreach (var L in layers)
+                        List<string> Layers = Brd.GetLayers(Brd.GetLayer(Layer));
+                        foreach (var L in Layers)
                         {
                             fills.Append($"  (gr_poly (pts (xy {X1} {-(Y1)}) (xy {X1} {-(Y2)}) (xy {X2} {-(Y2)}) (xy {X2} {-(Y1)})) (layer {L}) (width 0))\n");
                         }

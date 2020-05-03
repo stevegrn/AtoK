@@ -47,7 +47,15 @@ namespace ConvertToKicad
                     // it's a circle
                     return $"    (fp_circle (center {Math.Round(X1 - x, Precision)} {Math.Round(-(Y1 - y), Precision)}) (end {Math.Round(X2 - x, Precision)} {Math.Round(-(Y2 - y), Precision)}) (layer {Layer}) (width {Width}))\n";
                 else
-                    return $"    (fp_arc (start {Math.Round(X1 - x, Precision)} {Math.Round(-(Y1 - y), Precision)}) (end {Math.Round(X2 - x, Precision)} {Math.Round(-(Y2 - y), Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {Layer}) (width {Width}))\n";
+                {
+                    StringBuilder arc = new StringBuilder("");
+                    List<string> Layers = Brd.GetLayers(Layer);
+                    foreach (var L in Layers)
+                    {
+                        arc.Append($"    (fp_arc (start {Math.Round(X1 - x, Precision)} {Math.Round(-(Y1 - y), Precision)}) (end {Math.Round(X2 - x, Precision)} {Math.Round(-(Y2 - y), Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {L}) (width {Width}))\n");
+                    }
+                    return arc.ToString();
+                }
             }
 
             public override string ToString(double x, double y, double ModuleRotation)
@@ -60,11 +68,23 @@ namespace ConvertToKicad
                 if (Math.Abs(Angle) == 360)
                 {
                     // it's a circle
-                    return $"    (fp_circle (center {p1.X} {-p1.Y}) (end {p2.X} {-p2.Y}) (layer {Layer}) (width {Width}))\n";
+                    StringBuilder circle = new StringBuilder("");
+                    List<string> Layers = Brd.GetLayers(Layer);
+                    foreach (var L in Layers)
+                    {
+                        circle.Append($"    (fp_circle (center {p1.X} {-p1.Y}) (end {p2.X} {-p2.Y}) (layer {L}) (width {Width}))\n");
+                    }
+                    return circle.ToString();
                 }
                 else
                 {
-                    return $"    (fp_arc (start {Math.Round(p1.X, Precision)} {Math.Round(-p1.Y, Precision)}) (end {Math.Round(p2.X, Precision)} {Math.Round(-p2.Y, Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {Layer}) (width {Width}))\n";
+                    StringBuilder arc = new StringBuilder("");
+                    List<string> Layers = Brd.GetLayers(Layer);
+                    foreach (var L in Layers)
+                    {
+                        arc.Append($"    (fp_arc (start {Math.Round(p1.X, Precision)} {Math.Round(-p1.Y, Precision)}) (end {Math.Round(p2.X, Precision)} {Math.Round(-p2.Y, Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {L}) (width {Width}))\n");
+                    }
+                    return arc.ToString(); ;
                 }
             }
         }
@@ -173,16 +193,7 @@ namespace ConvertToKicad
                         // only add if not part of board outline
                         if ((layer != "Edge.Cuts") || !Brd.CheckExistingArc(X1, Y1, X, Y, Angle))
                         {
-                            List<string> Layers = new List<string>();
-                            if (layer == "*.Cu")
-                            {
-                                foreach (var L in Brd.OrderedLayers)
-                                {
-                                    Layers.Add(L.PcbNewLayer);
-                                }
-                            }
-                            else
-                                Layers.Add(layer);
+                            List<string> Layers = Brd.GetLayers(layer);
                             foreach (var L in Layers)
                             {
                                 arcs.Append($"  (gr_arc (start {Math.Round(X1, Precision)} {Math.Round(-Y1, Precision)}) (end {Math.Round(X, Precision)} {Math.Round(-Y, Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {L}) (width {Width}))\n");

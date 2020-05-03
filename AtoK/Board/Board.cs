@@ -539,6 +539,22 @@ namespace ConvertToKicad
                 return false;
             }
 
+            // get a list of layers to cope with multilayer
+            public List<string> GetLayers(string layer)
+            {
+                List<string> Layers = new List<string>();
+                if (layer == "*.Cu")
+                {
+                    foreach (var L in Brd.OrderedLayers)
+                    {
+                        Layers.Add(L.PcbNewLayer);
+                    }
+                }
+                else
+                    Layers.Add(layer);
+                return Layers;
+            }
+
         }
     }
 }

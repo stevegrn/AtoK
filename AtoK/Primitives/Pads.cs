@@ -51,7 +51,10 @@ namespace ConvertToKicad
             {
                 if (number == "")
                     number = "0";
-                Number = number;
+                if(number.Contains(" "))
+                    Number = $"\"{number}\"";
+                else
+                    Number = number;
 
                 Type = type;
                 Shape = shape;

@@ -90,24 +90,28 @@ namespace ConvertToKicad
                     // this is an inner layer so use plane clearance
                     clearance = GetRuleValue("PlaneClearance", "PlaneClearance");
                 }
-
-                ret.Append($"  (zone (net {NetNo}) (net_name {NetName}) (layer {Layer}) (tstamp 0) (hatch edge 0.508)");
-                ret.Append($"    (priority 100)\n");
-                ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
-                ret.Append($"    (min_thickness {TrackWidth})\n");
-                ret.Append("    (fill yes (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n");
-                var i = 0;
-                ret.Append("    (polygon (pts\n        ");
-                foreach (var Point in Points)
+                List<string> Layers = Brd.GetLayers(Brd.GetLayer(Layer));
+                foreach (var L in Layers)
                 {
-                    i++;
-                    if ((i % 5) == 0)
-                        ret.Append("\n        ");
-                    ret.Append(Point.ToString());
+
+                    ret.Append($"  (zone (net {NetNo}) (net_name {NetName}) (layer {L}) (tstamp 0) (hatch edge 0.508)");
+                    ret.Append($"    (priority 100)\n");
+                    ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
+                    ret.Append($"    (min_thickness {TrackWidth})\n");
+                    ret.Append("    (fill yes (arc_segments 16) (thermal_gap 0.2) (thermal_bridge_width 0.3))\n");
+                    var i = 0;
+                    ret.Append("    (polygon (pts\n        ");
+                    foreach (var Point in Points)
+                    {
+                        i++;
+                        if ((i % 5) == 0)
+                            ret.Append("\n        ");
+                        ret.Append(Point.ToString());
+                    }
+                    ret.Append("\n      )\n    )\n  )\n");
+                    if (IsSplitPlane)
+                        ret.Append("# Split Plane\n");
                 }
-                ret.Append("\n      )\n    )\n  )\n");
-                if (IsSplitPlane)
-                    ret.Append("# Split Plane\n");
 
                 return ret.ToString();
             }
