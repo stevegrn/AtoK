@@ -137,6 +137,7 @@ namespace ConvertToKicad
                 Component = via.Component;
                 X = Math.Round(ToMM(via.X) - originX, Precision);
                 Y = Math.Round(ToMM(via.Y) - originY, Precision);
+                CheckMinMax(X, Y);
                 Width = ToMM(via.Width);
                 HoleSize = ToMM(via.Hole);
                 bool InComponent = Component != -1;

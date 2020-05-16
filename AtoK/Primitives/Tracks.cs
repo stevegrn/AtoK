@@ -96,6 +96,9 @@ namespace ConvertToKicad
                 Y1 = Math.Round(ToMM(line, 17 + 5) - originY, Precision);
                 X2 = Math.Round(ToMM(line, 21 + 5) - originX, Precision);
                 Y2 = Math.Round(ToMM(line, 25 + 5) - originY, Precision);
+
+                CheckMinMax(X1 + originX, Y1 + originY);
+                CheckMinMax(X2 + originX, Y2 + originY);
                 width = Math.Round(ToMM(line, 29 + 5), Precision);
 
                 layer = (Layers)line[5];

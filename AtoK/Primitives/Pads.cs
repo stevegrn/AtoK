@@ -163,6 +163,8 @@ namespace ConvertToKicad
             {
                 Point2D p = new Point2D(X - x, Y - y);
 
+                CheckMinMax(p.X, p.Y);
+
                 if (Shape == "roundrect")
                 {
                     return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
@@ -183,10 +185,12 @@ namespace ConvertToKicad
 
             public override string ToString(double x, double y, double ModuleRotation)
             {
-                // point relative to module's centre
+                // point relative to module's centre x,y
                 Point2D p = new Point2D(X - x, Y - y);
 
                 p.Rotate(-ModuleRotation);
+
+                //CheckMinMax(p.X, p.Y);
 
                 if (Shape == "roundrect")
                 {
@@ -324,7 +328,7 @@ namespace ConvertToKicad
 
             public override bool ProcessBinaryFile(byte[] data)
             {
-                bool GenerateTxtFile = true;
+                bool GenerateTxtFile = false; // set to true to generate text version of the file
                 FileStream TextFile = null;
                 StartTimer();
                 if (Binary_size == 0)

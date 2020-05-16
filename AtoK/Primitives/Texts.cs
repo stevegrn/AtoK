@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Drawing;
+using System.Windows.Forms;
 
 namespace ConvertToKicad
 {
@@ -60,6 +62,7 @@ namespace ConvertToKicad
             double Rotation { get; set; }
             string Hide { get; set; }
             string Mirror { get; set; }
+            bool Italic { get; set; }
 
             private String()
             {
@@ -72,9 +75,10 @@ namespace ConvertToKicad
                 SizeY = 0;
                 Thickness = 0;
                 Hide = "";
+                Italic = false;
             }
 
-            public String(string reference, string value, double x, double y, double rotation, string layer, double sizeX, double sizeY, double thickness, string hide, bool mirror)
+            public String(string reference, string value, double x, double y, double rotation, string layer, double sizeX, double sizeY, double thickness, string hide, bool mirror, bool italic)
             {
                 Reference = reference;
                 Value = ToLiteral(value);
@@ -88,13 +92,14 @@ namespace ConvertToKicad
                 Rotation %= 360;
                 Hide = hide;
                 Mirror = (mirror) ? "mirror" : "";
+                Italic = Italic;
             }
 
             public string ToString(double x, double y)
             {
                 Point2D p = new Point2D(X - x, Y - y);
-
-                return $"    (fp_text {Reference} \"{Value}\" (at {p.X} {-p.Y} {Rotation} unlocked) (layer {Layer}) {Hide}\n      (effects (font (size {SizeX} {SizeY}) (thickness {Thickness})) (justify left {Mirror}))\n    )\n";
+                string It = Italic ? "italic" : "";
+                return $"    (fp_text {Reference} \"{Value}\" (at {p.X} {-p.Y} {Rotation} unlocked) (layer {Layer}) {Hide}\n      (effects (font (size {SizeX} {SizeY}) (thickness {Thickness}) {It}) (justify left {Mirror}))\n    )\n";
             }
 
             public override string ToString(double x, double y, double ModuleRotation)
@@ -125,9 +130,39 @@ namespace ConvertToKicad
 
         }
 
+        // class for truetype fonts
+        class TTFont
+        {
+            public string FontName    { get; set; }
+            public double Width       { get; set; }
+            public double Height      { get; set; }
+            public double TotalHeight { get; set; }
+            public double TTHeight    { get; set; }
+            public bool   Bold        { get; set; }
+            public bool   Italic      { get; set; }
+            public double CharWidth   { get; set; }
+
+            public TTFont()
+            {
+
+            }
+        }
+
         // class for the texts document entry in the pcbdoc file
         class Texts : PcbDocEntry
         {
+            List<TTFont> Fonts = new List<TTFont>();
+
+            TTFont FindFont( string Font, bool Bold, bool Italic, double Height)
+            {
+                foreach(var F in Fonts)
+                {
+                    if (F.FontName == Font && F.Bold == Bold && F.Italic == Italic && Math.Abs(F.Height - Height) <0.001)
+                        return F;
+                }
+                return null;
+            }
+
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
             unsafe struct Text
             {
@@ -147,7 +182,9 @@ namespace ConvertToKicad
                 public Int32 Thickness;                  //  41 4 thickness
                 public byte IsComment;                   //  45 1 designator flag
                 public byte IsDesignator;                //  46 1 comment flag
-                public fixed byte U3[4];                 //  47 120 ???
+                public fixed byte U3[2];                 //  47 120 ???
+                public byte Bold;                        //  49 1
+                public byte Italic;                      //  50 Italic
                 public fixed UInt16 FontName[32];        //  51 64 FontName in unicode (C# char=16 bits) 
                 public fixed byte U4[50];                // 115 50 ???
                 public byte TrueType;                    // 165 1 Truetype flag
@@ -174,6 +211,15 @@ namespace ConvertToKicad
                 return name;
             }
 
+            private void GetBoundingBox(string str, double X1, double Y1, double Angle, double H, double W)
+            {
+                double X2 = X1 + str.Length * W;
+                double Y2 = Y1 + H;
+                var P = new Point2D(X2, Y2);
+                P.Rotate(Angle);
+                CheckMinMax(X1, Y1);
+         //       CheckMinMax(P.X, P.Y);
+            }
 
             public Texts(string filename, string cmfilename, string record, Type type, int offset) : base(filename, cmfilename, record, type, offset)
             {
@@ -186,7 +232,6 @@ namespace ConvertToKicad
                 if (Binary_size == 0)
                     return false;
 
-                List<UInt32> Headers = new List<UInt32>();
 
                 long p = 0;
                 Int32 len;
@@ -216,6 +261,7 @@ namespace ConvertToKicad
                             double X = Math.Round(ToMM(text.X) - originX, Precision);
                             double Y = Math.Round(ToMM(text.Y) - originY, Precision);
                             double Height = Math.Round(ToMM(text.Height), Precision);
+                            double Width = 0;
                             double Rotation = text.Rotation % 360; // altium seem to store 0 as 360 quite a lot!
                             bool Mirror = text.Mirror != 0;
                             double Thickness = ToMM(text.Thickness);
@@ -223,6 +269,8 @@ namespace ConvertToKicad
                             bool IsDesignator = text.IsDesignator != 0;
                             bool TrueType = text.TrueType != 0;
                             UInt32 TextLen = br.ReadUInt32();
+                            bool Italic = text.Italic != 0;
+                            bool Bold = text.Bold != 0;
 
                             byte strlen = br.ReadByte();
                             byte[] textbytes = br.ReadBytes(strlen);
@@ -234,8 +282,49 @@ namespace ConvertToKicad
                             str = ConvertSpecialStrings(str, Component, layer);
                             if (TrueType)
                             {
-                                Thickness = Height / 10;    // fudge to get width the same as stroke font
-                                Height = Math.Round(Height / 2.2, Precision);     // fudge to get height the same as stroke font
+                                //string Font = text.FontName;
+                                StringBuilder SB = new StringBuilder("");
+                                unsafe
+                                {
+                                    for (int i = 0; i < 32; i++)
+                                    {
+                                        if (text.FontName[i] == 0)
+                                            break;
+                                        char c = (char)text.FontName[i];
+                                        SB.Append(c);
+                                    }
+                                }
+                                string Font = SB.ToString();
+                                TTFont F;
+                                FontFamily fontFamily = new FontFamily(Font);
+                                if ((F = FindFont(Font, Bold, Italic, Height))==null)
+                                {
+                                    // get metrics for font and bung it onto font list
+                                    FontStyle Style       = ((Bold) ? FontStyle.Bold : 0) | ((Italic) ? FontStyle.Italic : 0);
+                                    Font font             = new Font(fontFamily, 100, Style, GraphicsUnit.Pixel);
+                                    float Ascent          = font.FontFamily.GetCellAscent(Style);
+                                    float Descent         = font.FontFamily.GetCellDescent(Style);
+                                    float EmHeight        = font.FontFamily.GetEmHeight(Style);
+                                    float TotalHeight     = Ascent + Descent;
+                                    float InternalLeading = TotalHeight - EmHeight;
+                                    double TTHeight = (float)(Ascent - InternalLeading);
+                                    F = new TTFont();
+                                    F.FontName = Font;
+                                    F.Italic = Italic;
+                                    F.Bold = Bold;
+                                    F.TotalHeight = TotalHeight;
+                                    F.TTHeight = TTHeight;
+                                    F.Height = Height;
+                                    Height = Height / F.TotalHeight * F.TTHeight;
+                                    Height = Height - Height / 5;
+                                    F.TTHeight = Height;
+                                    Size CharWidth = TextRenderer.MeasureText("A", font);
+                                    F.CharWidth = Height * ((float)CharWidth.Height / (float)CharWidth.Width);
+                                    Fonts.Add(F);
+                                }
+                                Height = F.TTHeight;
+                                Thickness = Height / (Bold ? 5 : 10);
+                                Width = F.CharWidth;
                             }
 
                             str = str.Replace("\r", "");
@@ -249,7 +338,8 @@ namespace ConvertToKicad
                                 List<string> Layers = Brd.GetLayers(layer);
                                 foreach (var L in Layers)
                                 {
-                                    texts.Append($"  (gr_text \"{ToLiteral(str)}\" (at {Math.Round(X - X1, Precision)} {-Math.Round(Y + Y1, Precision)} {Math.Round(Rotation, Precision)})  (layer {L}) (effects (font (size {Height} {Height}) (thickness {Thickness})) (justify left {(Mirror ? "mirror" : "")})))\n");
+                                    string It = Italic ? "italic" : "";
+                                    texts.Append($"  (gr_text \"{ToLiteral(str)}\" (at {Math.Round(X - X1, Precision)} {-Math.Round(Y + Y1, Precision)} {Math.Round(Rotation, Precision)})  (layer {L}) (effects (font (size {Height} {Width}) (thickness {Thickness}) {It}) (justify left {(Mirror ? "mirror" : "")})))\n");
                                 }
                             }
                             else
@@ -298,7 +388,9 @@ namespace ConvertToKicad
                                         str = "%R";
                                 }
 
-                                String String = new String(type, str, X, Y, Rotation, layer, Height, Height, Thickness, Hide, Mirror);
+                                if(Hide == "")
+                                    GetBoundingBox(str, X, Y, Rotation, Height, Width);
+                                String String = new String(type, str, X, Y, Rotation, layer, Height, Width, Thickness, Hide, Mirror, Italic);
                                 ModulesL[Component].Strings.Add(String);
                             }
 

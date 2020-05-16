@@ -70,9 +70,9 @@ namespace ConvertToKicad
                 UInt32 pos = 0;
                 uint size = (uint)ms.Length;
 
-                BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
+                var br = new BinaryReader(ms, System.Text.Encoding.UTF8);
                 ms.Seek(pos, SeekOrigin.Begin);
-                List<UInt32> Starts = new List<UInt32>();
+                var Starts = new List<UInt32>();
                 // signature is
                 // byte 02
                 // int32 length
@@ -201,14 +201,14 @@ namespace ConvertToKicad
         private bool IsTexts6(byte[] data)
         {
             // check to see if header is the Texts file
-            using (MemoryStream ms = new MemoryStream(data))
+            using (var ms = new MemoryStream(data))
             {
                 UInt32 pos = 0;
                 uint size = (uint)ms.Length;
 
-                BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
+                var br = new BinaryReader(ms, System.Text.Encoding.UTF8);
                 ms.Seek(pos, SeekOrigin.Begin);
-                List<UInt32> Starts = new List<UInt32>();
+                var Starts = new List<UInt32>();
                 // signature is
                 // byte 05
                 // int32 length
@@ -439,7 +439,7 @@ namespace ConvertToKicad
                         CFStream stream = cf.RootStorage.TryGetStream(CurrentDir + "\\" + entry.Name);
                         if (stream != null && stream.Size != 0)
                         {
-                            byte[] data = new byte[stream.Size];
+                            var data = new byte[stream.Size];
                             stream.Read(data, 0, data.Length);
                             File.WriteAllBytes(CurrentDir + "\\" + entry.Name, data);
                         }

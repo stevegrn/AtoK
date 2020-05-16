@@ -18,13 +18,14 @@ namespace ConvertToKicad
     {
         static public string ReportFilename;
         static public int ReportLines;
+        static public double MinX, MinY, MaxX, MaxY;
     }
 
     public partial class ConvertPCBDoc
     {
         public static bool ConvertRunning = false;
         public const int Precision = 3; // after the decimal point precision i.e. 3 digits
-        static string net_classes = "";
+        static StringBuilder net_classes;
         static StringBuilder tracks;
         static UInt32 track_count = 0;
         static StringBuilder texts;
@@ -86,15 +87,15 @@ namespace ConvertToKicad
         static string ZlibCodecDecompress(byte[] compressed)
         {
             int outputSize = 2048;
-            byte[] output = new Byte[outputSize];
+            var output = new Byte[outputSize];
 
             // If you have a ZLIB stream, set this to true.  If you have
             // a bare DEFLATE stream, set this to false.
             bool expectRfc1950Header = true;
 
-            using (MemoryStream ms = new MemoryStream())
+            using (var ms = new MemoryStream())
             {
-                ZlibCodec compressor = new ZlibCodec();
+                var compressor = new ZlibCodec();
                 compressor.InitializeInflate(expectRfc1950Header);
 
                 compressor.InputBuffer = compressed;
@@ -380,7 +381,7 @@ namespace ConvertToKicad
                 return Name;
             // name is negated fully or in part
             // prepend ~ and another if negated chars end before end of string
-            StringBuilder ret = new StringBuilder("");
+            var ret = new StringBuilder("");
             bool negating = false;
             for (var i = 0; i < Name.Length; i++)
             {
@@ -465,6 +466,7 @@ namespace ConvertToKicad
             {
                 X = x;
                 Y = y;
+                CheckMinMax(X, Y);
             }
 
             public override string ToString()
@@ -582,7 +584,7 @@ namespace ConvertToKicad
                     return false;
 
                 watch.Start();
-                MemoryStream ms = new MemoryStream(data);
+                var ms = new MemoryStream(data);
                 long size = ms.Length;
                 if (size == 0)
                     return true;
@@ -594,7 +596,7 @@ namespace ConvertToKicad
                 // record
                 // so record size is offset + 5
 
-                BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
+                var br = new BinaryReader(ms, System.Text.Encoding.UTF8);
                 ms.Seek(1, SeekOrigin.Begin);
                 Binary_size = (UInt32)br.ReadInt32();
                 Binary_size += 5;
@@ -621,7 +623,7 @@ namespace ConvertToKicad
                 if (Type != Type.text)
                     return false;
 
-                using (MemoryStream ms = new MemoryStream(data))
+                using (var ms = new MemoryStream(data))
                 {
                     UInt32 pos = 0;
                     long size = ms.Length;
@@ -629,7 +631,7 @@ namespace ConvertToKicad
                     if (size == 0)
                         return false;
 
-                    BinaryReader br = new BinaryReader(ms, System.Text.Encoding.UTF8);
+                    var br = new BinaryReader(ms, System.Text.Encoding.UTF8);
                     ms.Seek(0, SeekOrigin.Begin);
                     while (pos + 4 < size)
                     {
@@ -642,7 +644,7 @@ namespace ConvertToKicad
                         }
                         char[] line = br.ReadChars((int)next);
 
-                        string str = new string(line);
+                        var str = new string(line);
                         if (str.Length > 10) // fudge
                             ProcessLine(str.TrimEnd('\0'));
                         pos += (next + (UInt32)offset);
@@ -717,7 +719,7 @@ namespace ConvertToKicad
 
             public override string ToString()
             {
-                StringBuilder ret = new StringBuilder("");
+                var ret = new StringBuilder("");
                 try
                 {
                     for (var i = 0; i < base.Count; i++)
@@ -739,7 +741,7 @@ namespace ConvertToKicad
 
             public string ToString(double x, double y, double rotation)
             {
-                StringBuilder ret = new StringBuilder("");
+                var ret = new StringBuilder("");
                 for (var i = 0; i < base.Count; i++)
                 {
                     ret.Append(base[i].ToString(x, y, rotation));
@@ -910,7 +912,7 @@ namespace ConvertToKicad
         {
             try
             {
-                DirectoryInfo dir = new DirectoryInfo(FolderName);
+                var dir = new DirectoryInfo(FolderName);
 
                 // delete any files
                 foreach (FileInfo fi in dir.GetFiles())
@@ -1019,9 +1021,21 @@ namespace ConvertToKicad
                 return $"{time} mS";
         }
 
+        static public void CheckMinMax(double x, double y)
+        {
+            if (x < Globals.MinX)
+                Globals.MinX = x;
+            if (x > Globals.MaxX)
+                Globals.MaxX = x;
+            if (y < Globals.MinY)
+                Globals.MinY = y;
+            if (y > Globals.MaxY)
+                Globals.MaxY = y;
+        }
+
         public unsafe void ConvertFile(string FileName, bool extractFiles, bool createLib)
         {
-            net_classes = "";
+            net_classes = new StringBuilder("");
             tracks      = new StringBuilder("");
             texts       = new StringBuilder("");
             arcs        = new StringBuilder("");
@@ -1049,12 +1063,16 @@ namespace ConvertToKicad
                 RegionsL       = new ObjectList<Region>();
                 Segments       = new ObjectList<Line>();
 
+                Globals.MinX = Double.MaxValue;
+                Globals.MinY = Double.MaxValue;
+                Globals.MaxX = Double.MinValue;
+                Globals.MaxY = Double.MinValue;
 
                 OutputString("Starting");
                 ExtractFiles = extractFiles;
                 CreateLib = createLib;
                 // start off the nets
-                Net NoNet = new Net(0, "");
+                var NoNet = new Net(0, "");
                 NetsL.Add(NoNet);
 
                 filename = FileName;
@@ -1102,7 +1120,7 @@ namespace ConvertToKicad
                     System.Environment.Exit(0);
                 }
 
-                CompoundFile cf = new CompoundFile(filename);
+                var cf = new CompoundFile(filename);
 
                 FV = new FileVersionInfo("FileVersionInfo", "38434311D9D84DCDB403436D1149A8", "", Type.text, 4);
                 CFStorage storage = cf.RootStorage.TryGetStorage(FV.FileName);
@@ -1264,7 +1282,11 @@ namespace ConvertToKicad
                     OutFile.WriteLine($"    (nets {NetsL.Count})");
                     OutFile.WriteLine("  )");
                     OutFile.WriteLine("");
-                    OutFile.WriteLine("  (page A4)");
+                    Globals.MinX -= 10;
+                    Globals.MaxX += 10;
+                    Globals.MinY -= 10;
+                    Globals.MaxY += 10;
+                    OutFile.WriteLine($"  (page \"User\" {Globals.MaxX - Globals.MinX + 20} {Globals.MaxY - Globals.MinY + 20})");
                     OutFile.WriteLine("  (layers");
                     // output the layer stack
                     OutFile.WriteLine(Brd.ToString());
@@ -1315,7 +1337,8 @@ namespace ConvertToKicad
                     OutFile.WriteLine("    (pad_drill 0.6)");
                     OutFile.WriteLine("    (pad_to_mask_clearance 0.1)"); // TODO should get value from design rules
                     OutFile.WriteLine("    (aux_axis_origin 0 0)");
-                    OutFile.WriteLine("    (visible_elements 7FFFF77F)"); // TODO find out what this should be
+                    OutFile.WriteLine("    (grid_origin 0 0)");
+                    OutFile.WriteLine("    (visible_elements 7FFFFF7F)"); // TODO find out what this should be
                     OutFile.WriteLine("    (pcbplotparams");
                     OutFile.WriteLine("      (layerselection 262143)"); // TODO and this
                     OutFile.WriteLine("      (usegerberextensions false)");
@@ -1344,12 +1367,11 @@ namespace ConvertToKicad
                     OutFile.WriteLine("  )");
                     OutFile.WriteLine("");
                 }
-
                 OutFile.WriteLine(NetsL.ToString());
-                OutFile.WriteLine(net_classes);
+                OutFile.WriteLine(net_classes.ToString());
                 OutFile.WriteLine(Brd.OutputBoardOutline());
                 OutFile.WriteLine(ModulesL.ToString());
-                //            PadsL.ToString(); N.B. KiCad doesn't allow free standing pads yet ...TODO create modules to do this
+                // PadsL.ToString(); N.B. KiCad doesn't allow free standing pads yet ...TODO create modules to do this
                 OutFile.WriteLine(PolygonsL.ToString());
                 OutFile.WriteLine(ViasL.ToString());
                 OutFile.WriteLine(tracks.ToString());
@@ -1359,6 +1381,10 @@ namespace ConvertToKicad
                 OutFile.WriteLine(keepouts.ToString());
                 OutFile.WriteLine(DimensionsL.ToString());
                 OutFile.WriteLine(RegionsL.ToString());
+                OutFile.WriteLine($"(gr_line(start {Globals.MinX} { -Globals.MinY}) (end {Globals.MaxX} { -Globals.MinY}) (width {0.5}) (layer \"Eco1.User\"))\n");
+                OutFile.WriteLine($"(gr_line(start {Globals.MaxX} { -Globals.MinY}) (end {Globals.MaxX} { -Globals.MaxY}) (width {0.5}) (layer \"Eco1.User\"))\n");
+                OutFile.WriteLine($"(gr_line(start {Globals.MaxX} { -Globals.MaxY}) (end {Globals.MinX} { -Globals.MaxY}) (width {0.5}) (layer \"Eco1.User\"))\n");
+                OutFile.WriteLine($"(gr_line(start {Globals.MinX} { -Globals.MaxY}) (end {Globals.MinX} { -Globals.MinY}) (width {0.5}) (layer \"Eco1.User\"))\n");
                 OutFile.WriteLine(")");
 
                 OutFile.Close();
@@ -1380,7 +1406,7 @@ namespace ConvertToKicad
                     // change to the directory
                     Directory.SetCurrentDirectory(dir);
 
-                    List<Module> UniqueModules = new List<Module>();
+                    var UniqueModules = new List<Module>();
 
                     // build list of unique modules
                     foreach (var Mod in ModulesL)

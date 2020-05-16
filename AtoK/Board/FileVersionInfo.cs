@@ -118,8 +118,7 @@ namespace ConvertToKicad
 
             public override bool ProcessLine(string line)
             {
-                string[] words;
-                words = line.Split('|');
+                string[] words = line.Split('|');
                 string[] chars;
                 string str = "";
                 string ver = "";
@@ -156,7 +155,7 @@ namespace ConvertToKicad
                         if (str.Contains("BKM"))
                         {
                             bck = str;
-                            Version Version = new Version(ver, fwd, bck);
+                            var Version = new Version(ver, fwd, bck);
                             Versions.Add(Version);
                             //OutputString(Version.ToString());
                         }

@@ -90,7 +90,6 @@ namespace ConvertToKicad
 
                 public Layer(string line, int number)
                 {
-                    string[] words = line.Split('|');
                     Name               = GetString(line, $"LAYER{number}NAME=");
                     Prev               = Convert.ToInt16(GetString(line, $"LAYER{number}PREV="));
                     Next               = Convert.ToInt16(GetString(line, $"LAYER{number}NEXT="));
@@ -182,21 +181,22 @@ namespace ConvertToKicad
 
             public override bool ProcessLine(string line)
             {
-                string[] words = line.Split('|');
                 base.ProcessLine();
                 try
                 {
                     InnerLayerCount = 0;
                     string ORIGINX = GetString(line, "ORIGINX=");
-                    string ORIGINY = GetString(line, "ORIGINX=");
+                    string ORIGINY = GetString(line, "ORIGINY=");
                     if (ORIGINX != "")
                         OriginX = originX = GetCoordinateX(ORIGINX);
                     if (ORIGINY != "")
                         OriginY = originY = GetCoordinateY(GetString(line, "ORIGINY="));
                     OutputString($"ORIGINX={OriginX} ORIGINY={OriginY}");
+                    originX = 0;
+                    originY = 0;
                     if (ORIGINX != "" && ORIGINY != "")
                     {
-                        List<string> strings = new List<string>();
+                        var strings = new List<string>();
                         // this is the first line in the file and contains the board outline details
                         int count = 0;
                         string search;
@@ -261,11 +261,13 @@ namespace ConvertToKicad
                         {
                             for (var i = 1; i < 83; i++)
                             {
-                                Layer Layer = new Layer(line, i);
-                                //OutputError($"Found layer - {Layer.AltiumName} name={Layer.Name} number={Layer.Number}");
+                                var Layer = new Layer(line, i);
                                 if (Layer.Prev != 0 || Layer.Next != 0)
+                                {
+                                    //OutputError($"Found layer - {Layer.AltiumName} name={Layer.Name} number={Layer.Number}");
                                     // only add layers that are in the layer stack
                                     LayersL.Add(Layer);
+                                }
                             }
                         }
                         catch (Exception Ex)
@@ -542,7 +544,7 @@ namespace ConvertToKicad
             // get a list of layers to cope with multilayer
             public List<string> GetLayers(string layer)
             {
-                List<string> Layers = new List<string>();
+                var Layers = new List<string>();
                 if (layer == "*.Cu")
                 {
                     foreach (var L in Brd.OrderedLayers)

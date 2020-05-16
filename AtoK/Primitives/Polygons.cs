@@ -107,6 +107,7 @@ namespace ConvertToKicad
                         if ((i % 5) == 0)
                             ret.Append("\n        ");
                         ret.Append(Point.ToString());
+                        CheckMinMax(Point.X, Point.Y);
                     }
                     ret.Append("\n      )\n    )\n  )\n");
                     if (IsSplitPlane)

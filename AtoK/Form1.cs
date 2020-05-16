@@ -389,7 +389,7 @@ namespace AtoK
             outputList.BeginUpdate();
             var selectedIndices = new List<int>(outputList.SelectedIndices.Cast<int>());
             // but first copy selected text to the clipboard
-            StringBuilder Selected = new StringBuilder("");
+            var Selected = new StringBuilder("");
             selectedIndices.ForEach(index => Selected.Append(((Line)outputList.Items[index]).Str + "\n"));
             String dest = String.Join("\r\n", Selected.ToString());
             if (dest != "")
@@ -603,7 +603,7 @@ namespace AtoK
                     {
                         if (ShowWarnings() == DialogResult.OK)
                         {
-                            Process p = new Process();
+                            var p = new Process();
 
                             p.StartInfo = new ProcessStartInfo(Form1.TextEditorLoc, "\"" + Globals.ReportFilename + "\"");
                             p.StartInfo.RedirectStandardOutput = false;
@@ -628,7 +628,7 @@ namespace AtoK
         private void LaunchPCBNew_Click(object sender, EventArgs e)
         {
             busy.Select();
-            Process p = new Process();
+            var p = new Process();
             if (FileHistory.Text != "" && File.Exists(FileHistory.Text))
             {
                 string filename = FileHistory.Text;
@@ -709,7 +709,7 @@ namespace AtoK
 
         private void CleanUp_Click(object sender, EventArgs e)
         {
-            CleanUp Clean = new CleanUp();
+            var Clean = new CleanUp();
             Clean.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             Clean.Location = new System.Drawing.Point((this.Location.X + this.Width / 2) - (Clean.Width / 2), (this.Location.Y + this.Height / 2) - (Clean.Height / 2));
             Clean.ShowDialog();
@@ -725,7 +725,7 @@ namespace AtoK
         private void Edit_Click(object sender, EventArgs e)
         {
             busy.Select();
-            Process p = new Process();
+            var p = new Process();
             if (FileHistory.Text != "" && File.Exists(FileHistory.Text))
             {
                 string UnpackDirectory = FileHistory.Text.Substring(0, FileHistory.Text.LastIndexOf('.')) + "-Kicad";
@@ -783,7 +783,7 @@ namespace AtoK
 
         private void SaveFileHistory()
         {
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
             foreach (var item in FileHistory.Items)
             {
                 if (item.ToString() != "")

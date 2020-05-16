@@ -48,11 +48,17 @@ namespace ConvertToKicad
                     return $"    (fp_circle (center {Math.Round(X1 - x, Precision)} {Math.Round(-(Y1 - y), Precision)}) (end {Math.Round(X2 - x, Precision)} {Math.Round(-(Y2 - y), Precision)}) (layer {Layer}) (width {Width}))\n";
                 else
                 {
-                    StringBuilder arc = new StringBuilder("");
+                    double Xs = Math.Round(X1 - x, Precision);
+                    double Ys = Math.Round(Y1 - y, Precision);
+                    double Xe = Math.Round(X2 - x, Precision);
+                    double Ye = Math.Round(Y2 - y, Precision);
+                    CheckMinMax(Xs, Ys);
+                    CheckMinMax(Xe, Xe);
+                    var arc = new StringBuilder("");
                     List<string> Layers = Brd.GetLayers(Layer);
                     foreach (var L in Layers)
                     {
-                        arc.Append($"    (fp_arc (start {Math.Round(X1 - x, Precision)} {Math.Round(-(Y1 - y), Precision)}) (end {Math.Round(X2 - x, Precision)} {Math.Round(-(Y2 - y), Precision)}) (angle {Math.Round(Angle, Precision)}) (layer {L}) (width {Width}))\n");
+                        arc.Append($"    (fp_arc (start {Xs} {-Ys}) (end {Xe} {Ye}) (angle {Math.Round(Angle, Precision)}) (layer {L}) (width {Width}))\n");
                     }
                     return arc.ToString();
                 }
@@ -171,12 +177,13 @@ namespace ConvertToKicad
                         X = Radius * Math.Cos(start_angle);
                         Y = Radius * Math.Sin(start_angle);
 
+                        tracks.Append($"# arc start {Math.Round(X1, Precision)},{Math.Round(Y1, Precision)} end  {Math.Round(X1, Precision)},{Math.Round(Y1, Precision)} angle {Math.Round(Angle, 0)}\n");
                         // generate arc segments at 5° increments
                         for (double angle = start_angle; angle < end_angle; angle += 2 * Math.PI / 72)
                         {
                             X1 = Radius * Math.Cos(angle);
                             Y1 = Radius * Math.Sin(angle);
-                            tracks.Append($"  (segment (start {XC + X} {-(YC + Y)}) (end {XC + X1} {-(YC + Y1)}) (width {Width}) (layer {layer}) (net {net}))\n");
+                            tracks.Append($"  (segment (start {Math.Round(XC + X, Precision)} {Math.Round(-(YC + Y), Precision)}) (end {Math.Round(XC + X1, Precision)} {Math.Round(-(YC + Y1), Precision)}) (width {Math.Round(Width, Precision)}) (layer {layer}) (net {net}))\n");
                             //Line Line = new Line(X1, Y1, X2, Y2, Layer, Width, true);
                             //Segments.Add(Line);
                             X = X1;
@@ -185,8 +192,9 @@ namespace ConvertToKicad
                         // do last segment
                         if (X != X2 || Y != Y2)
                         {
-                            tracks.Append($"  (segment (start {X + XC} {-(Y + YC)}) (end {X2 + XC} {-(Y2 + YC)}) (width {Width}) (layer {layer}) (net {net}))\n");
+                            tracks.Append($"  (segment (start {Math.Round(X + XC, Precision)} {Math.Round(-(Y + YC), Precision)}) (end {Math.Round(X2 + XC, Precision)} {Math.Round(-(Y2 + YC), Precision)}) (width {Width}) (layer {layer}) (net {net}))\n");
                         }
+                        tracks.Append("# end arc\n");
                     }
                     else
                     {

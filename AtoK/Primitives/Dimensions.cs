@@ -208,8 +208,8 @@ namespace ConvertToKicad
 
                 text = $"\"{length}mm\"";
 
-                StringBuilder string1 = new StringBuilder("");
-                List<string> Layers = Brd.GetLayers(Brd.GetLayer(layer));
+                var string1 = new StringBuilder("");
+                var Layers = Brd.GetLayers(Brd.GetLayer(layer));
                 foreach (var L in Layers)
                 {
                     string1.Append($@"
@@ -226,6 +226,13 @@ namespace ConvertToKicad
     (arrow2b  (pts (xy {end.X} {-end.Y}) (xy {a2b.X} {-a2b.Y})))
   )");
                 }
+                CheckMinMax(X1, Y1);
+                CheckMinMax(end.X, end.Y);
+                CheckMinMax(a1a.X, a1a.Y);
+                CheckMinMax(a1b.X, a1b.Y);
+                CheckMinMax(a2a.X, a2a.Y);
+                CheckMinMax(a2b.X, a2b.Y);
+
                 return string1.ToString() ;
             }
         }

@@ -115,6 +115,8 @@ namespace ConvertToKicad
                         Y2 = Math.Round(Bytes2mm(br.ReadBytes(4)) - originY, Precision);
                         ms.Seek(29, SeekOrigin.Begin);
                         Rotation = br.ReadDouble();
+                        CheckMinMax(X1, Y1);
+                        CheckMinMax(X2, Y2);
                     }
                     if (Keepout == 2)
                     {

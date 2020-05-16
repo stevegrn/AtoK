@@ -56,7 +56,6 @@ namespace ConvertToKicad
                 Net net = new Net(net_no + 1, Net_name);
 
                 NetsL.Add(net);
-
                 net_no++;
 
                 return true;

@@ -46,13 +46,13 @@ namespace ConvertToKicad
                     string[] words = line.Split('|');
                     string name = GetString(line, "|NAME=");
 
-                    net_classes += ($"  (net_class \"{name}\"  \"{name}\"\n    (clearance 0.127)\n    (trace_width 0.254)\n    (via_dia 0.889)\n    (via_drill 0.635)\n    (uvia_dia 0.508)\n    (uvia_drill 0.127)\n");
+                    net_classes.Append($"  (net_class \"{name}\"  \"{name}\"\n    (clearance 0.127)\n    (trace_width 0.254)\n    (via_dia 0.889)\n    (via_drill 0.635)\n    (uvia_dia 0.508)\n    (uvia_drill 0.127)\n");
                     for (int c = 10; c < words.Length - 1; c++)
                     {
                         split = words[c].Split('=');
-                        net_classes += ($"    (add_net \"{ConvertIfNegated(ToLiteral(split[1]))}\")\n");
+                        net_classes.Append($"    (add_net \"{ConvertIfNegated(ToLiteral(split[1]))}\")\n");
                     }
-                    net_classes += (" )\n");
+                    net_classes.Append(" )\n");
                 }
                 return true;
             }
