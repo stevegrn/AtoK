@@ -7,7 +7,7 @@ namespace ConvertToKicad
     public partial class ConvertPCBDoc
     {
         // class for dimension objects (not all dimension types catered for)
-        class Dimension : Object
+        class Dimension : PCBObject
         {
             private readonly string layer = "";
             private string text = "";
@@ -17,6 +17,8 @@ namespace ConvertToKicad
             private readonly int TEXTPRECISION;
             private readonly Int16 DIMENSIONKIND;
             private readonly char[] charsToTrim = { 'm', 'i', 'l' };
+            private string DimensionUnit = "";
+
             double length;
 
             private string GetString(string line, string s)
@@ -47,6 +49,7 @@ namespace ConvertToKicad
             public Dimension(string line)
             {
                 string param;
+                string[] words = line.Split('|');
                 if ((param = GetString(line, "|X1=").Trim(charsToTrim)) != "")
                 {
                     X1 = GetCoordinateX(param);
@@ -160,16 +163,20 @@ namespace ConvertToKicad
                 {
                     TEXTPRECISION = Convert.ToInt32(param);
                 }
-
+                if ((param = GetString(line, "|TEXTDIMENSIONUNIT=").Trim(charsToTrim)) != "")
+                {
+                    DimensionUnit = param;
+                }
             }
 
-            override public string ToString()
+            public override string ToString()
             {
                 if (DIMENSIONKIND != 1) // TODO fix this - filter out radial dimensions
                 {
                     OutputError($"Unsupported Dimension kind ({DIMENSIONKIND}) at {X1},{Y1}");
                     return "";
                 }
+                // translate to fit in worksheet
                 Point2D R0 = new Point2D(REFERENCE0POINTX, REFERENCE0POINTY);
                 Point2D R1 = new Point2D(REFERENCE1POINTX, REFERENCE1POINTY);
                 Point2D centre = new Point2D(X1, Y1);
@@ -179,7 +186,7 @@ namespace ConvertToKicad
                 R1 = R1.Rotate(centre, -ANGLE);
                 Point2D end = new Point2D(R1.X, Y1);
                 // calculate the length of the crossbar
-                length = Math.Round(R1.X - X1, 1);
+                length = R1.X - X1; // length in mm
                 // calculate the end points of the arrow features
                 Point2D a1a = new Point2D(X1 + ARROWSIZE, Y1 + ARROWSIZE / 3);
                 Point2D a1b = new Point2D(X1 + ARROWSIZE, Y1 - ARROWSIZE / 3);
@@ -195,6 +202,43 @@ namespace ConvertToKicad
                     a2a = new Point2D(end.X + ARROWSIZE, end.Y + ARROWSIZE / 3);
                     a2b = new Point2D(end.X + ARROWSIZE, end.Y - ARROWSIZE / 3);
                 }
+                string units;
+                int Ilength;
+                int Dlength;
+                // convert length to string based on Units and precision
+                switch(DimensionUnit)
+                {
+                    case "Mils":
+                        length = length / 25.4 * 1000;
+                        units = "mil";
+                        break;
+                    case "Millimeters":
+                        units = "mm";
+                        break;
+                    case "Inches":
+                        length = length /25.4;
+                        units = "in";
+                        break;
+                    case "Centimeters":
+                        length = length / 10;
+                        units = "cm";
+                        break;
+                    default:// mm
+                        units = "mm";
+                        break;
+                }
+
+                length = Math.Round(length, TEXTPRECISION);
+                Int32 MP = Convert.ToInt32(Math.Pow(10, TEXTPRECISION));
+                Int32 FP = Convert.ToInt32(length * Math.Pow(10, TEXTPRECISION));
+
+                Ilength = FP / MP;
+                Dlength = FP - Ilength * MP;
+                string Decimal = Dlength.ToString("D" + TEXTPRECISION);
+                if(TEXTPRECISION==0)
+                    text = $"{Ilength}{units}";
+                else
+                    text = $"{Ilength}.{Decimal}{units}";
 
                 // rotate all the points back
                 a1a = a1a.Rotate(centre, ANGLE);
@@ -205,8 +249,6 @@ namespace ConvertToKicad
                 R0 = R0.Rotate(centre, ANGLE);
                 R1 = R1.Rotate(centre, ANGLE);
                 end = end.Rotate(centre, ANGLE);
-
-                text = $"\"{length}mm\"";
 
                 var string1 = new StringBuilder("");
                 var Layers = Brd.GetLayers(Brd.GetLayer(layer));

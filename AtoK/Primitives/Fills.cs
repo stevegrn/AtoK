@@ -9,7 +9,7 @@ namespace ConvertToKicad
     public partial class ConvertPCBDoc
     {
         // class for fill objects
-        class Fill : Object
+        class Fill : PCBObject
         {
             private readonly double X1, Y1, X2, Y2, CX, CY;
             private readonly string layer;

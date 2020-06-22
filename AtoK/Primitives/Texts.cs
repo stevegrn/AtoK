@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Drawing.Text;
 
 namespace ConvertToKicad
 {
@@ -18,7 +19,7 @@ namespace ConvertToKicad
             {
                 switch (c)
                 {
-                    case '\'': literal.Append(@"\'"); break;
+                    //case '\'': literal.Append(@"\'"); break;
                     case '\"': literal.Append(@"\"""); break;
                     //    case '\\': literal.Append(@"\\"); break;
                     case '\0': literal.Append(@"\0"); break;
@@ -49,7 +50,7 @@ namespace ConvertToKicad
 
 
         // class for text objects
-        class String : Object
+        class String : PCBObject
         {
             string Reference { get; set; }
             public string Value { get; set; }
@@ -180,8 +181,8 @@ namespace ConvertToKicad
                 public double Rotation;                  //  32 8 rotation
                 public byte Mirror;                      //  40 1 mirror
                 public Int32 Thickness;                  //  41 4 thickness
-                public byte IsComment;                   //  45 1 designator flag
-                public byte IsDesignator;                //  46 1 comment flag
+                public byte IsComment;                   //  45 1 comment flag
+                public byte IsDesignator;                //  46 1 designator flag
                 public fixed byte U3[2];                 //  47 120 ???
                 public byte Bold;                        //  49 1
                 public byte Italic;                      //  50 Italic
@@ -232,7 +233,6 @@ namespace ConvertToKicad
                 if (Binary_size == 0)
                     return false;
 
-
                 long p = 0;
                 Int32 len;
                 string str = "";
@@ -261,7 +261,7 @@ namespace ConvertToKicad
                             double X = Math.Round(ToMM(text.X) - originX, Precision);
                             double Y = Math.Round(ToMM(text.Y) - originY, Precision);
                             double Height = Math.Round(ToMM(text.Height), Precision);
-                            double Width = 0;
+                            double Width = Math.Round(ToMM(text.Height), Precision);
                             double Rotation = text.Rotation % 360; // altium seem to store 0 as 360 quite a lot!
                             bool Mirror = text.Mirror != 0;
                             double Thickness = ToMM(text.Thickness);
@@ -296,35 +296,49 @@ namespace ConvertToKicad
                                 }
                                 string Font = SB.ToString();
                                 TTFont F;
-                                FontFamily fontFamily = new FontFamily(Font);
-                                if ((F = FindFont(Font, Bold, Italic, Height))==null)
+                                FontFamily fontFamily = null;
+                                try
                                 {
-                                    // get metrics for font and bung it onto font list
-                                    FontStyle Style       = ((Bold) ? FontStyle.Bold : 0) | ((Italic) ? FontStyle.Italic : 0);
-                                    Font font             = new Font(fontFamily, 100, Style, GraphicsUnit.Pixel);
-                                    float Ascent          = font.FontFamily.GetCellAscent(Style);
-                                    float Descent         = font.FontFamily.GetCellDescent(Style);
-                                    float EmHeight        = font.FontFamily.GetEmHeight(Style);
-                                    float TotalHeight     = Ascent + Descent;
-                                    float InternalLeading = TotalHeight - EmHeight;
-                                    double TTHeight = (float)(Ascent - InternalLeading);
-                                    F = new TTFont();
-                                    F.FontName = Font;
-                                    F.Italic = Italic;
-                                    F.Bold = Bold;
-                                    F.TotalHeight = TotalHeight;
-                                    F.TTHeight = TTHeight;
-                                    F.Height = Height;
-                                    Height = Height / F.TotalHeight * F.TTHeight;
-                                    Height = Height - Height / 5;
-                                    F.TTHeight = Height;
-                                    Size CharWidth = TextRenderer.MeasureText("A", font);
-                                    F.CharWidth = Height * ((float)CharWidth.Height / (float)CharWidth.Width);
-                                    Fonts.Add(F);
+                                    fontFamily = new FontFamily(Font);
+                                    // check if font is on font list
+                                    if ((F = FindFont(Font, Bold, Italic, Height))==null)
+                                    {
+                                        // get metrics for font and bung it onto font list
+                                        FontStyle Style       = ((Bold) ? FontStyle.Bold : 0) | ((Italic) ? FontStyle.Italic : 0);
+                                        Font font             = new Font(fontFamily, 100, Style, GraphicsUnit.Pixel);
+                                        float Ascent          = font.FontFamily.GetCellAscent(Style);
+                                        float Descent         = font.FontFamily.GetCellDescent(Style);
+                                        float EmHeight        = font.FontFamily.GetEmHeight(Style);
+                                        float TotalHeight     = Ascent + Descent;
+                                        float InternalLeading = TotalHeight - EmHeight;
+                                        double TTHeight = (float)(Ascent - InternalLeading);
+                                        F = new TTFont
+                                        {
+                                            FontName = Font,
+                                            Italic = Italic,
+                                            Bold = Bold,
+                                            TotalHeight = TotalHeight,
+                                            TTHeight = TTHeight,
+                                            Height = Height
+                                        };
+                                        Height = Height / F.TotalHeight * F.TTHeight;
+                                        Height = Height - Height / 5;
+                                        F.TTHeight = Height;
+                                        Size CharWidth = TextRenderer.MeasureText("A", font);
+                                        F.CharWidth = Height * ((float)CharWidth.Height / (float)CharWidth.Width);
+                                        Fonts.Add(F);
+                                    }
+                                    Height = F.TTHeight;
+                                    Thickness = Height / (Bold ? 5 : 10);
+                                    Width = F.CharWidth;
                                 }
-                                Height = F.TTHeight;
-                                Thickness = Height / (Bold ? 5 : 10);
-                                Width = F.CharWidth;
+                                catch (ArgumentException)
+                                {
+                                    OutputError($"Font {Font} does not exist on this computer");
+                                    // couldn't find font so estimate size
+                                    Height = Height / 2; 
+                                    Width = Height;
+                                }
                             }
 
                             str = str.Replace("\r", "");
@@ -355,7 +369,7 @@ namespace ConvertToKicad
                                     {
                                         // Virtual designator TODO get this from board info
                                         // in project file
-                                        str = str.Substring(0, str.IndexOf('_'));
+                                        //str = str.Substring(0, str.IndexOf('_')); // TODO not possible to do this in pcbnew
                                     }
                                     Mod.Designator = str;
                                 }

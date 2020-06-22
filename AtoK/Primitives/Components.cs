@@ -20,17 +20,19 @@ namespace ConvertToKicad
         }
 
         // class for module objects
-        class Module : Object
+        class Module : PCBObject
         {
             static int ID = 0;
             public string Name { get; set; }
             public string Layer { get; set; }
             string Tedit { get; set; }
             string Tstamp { get; set; }
-            public string Designator { get; set; }
+           // public string Designator { get; set; }
             public bool DesignatorOn { get; set; }
-            public string Comment { get; set; }
+          //  public string Comment { get; set; }
             public bool CommentOn { get; set; }
+            public bool Locked { get; set; }
+            public bool PrimitiveLock { get; set; }
             public double X { get; set; }
             public double Y { get; set; }
             string Path { get; set; }
@@ -56,6 +58,11 @@ namespace ConvertToKicad
             public Module(string line)
             {
                 string param;
+                string[] words = line.Split('|');
+
+                Designator = "";
+                Comment = "";
+
                 Name = GetString(line, "|PATTERN=");
                 ComponentKind = GetString(line, "|COMPONENTKIND=");
                 if (Name.Contains("\\"))
@@ -85,6 +92,16 @@ namespace ConvertToKicad
                 {
                     CommentOn = param == "TRUE";
                 }
+                Locked = false;
+                if ((param = GetString(line, "|LOCKED=")) != "")
+                {
+                    Locked = param == "TRUE";
+                }
+                PrimitiveLock = false;
+                if ((param = GetString(line, "|PRIMITIVELOCK=")) != "")
+                {
+                    PrimitiveLock = param == "TRUE";
+                }
                 Rotation = 0;
                 if ((param = GetString(line, "|ROTATION=").Trim(charsToTrim)) != "")
                 {
@@ -101,7 +118,7 @@ namespace ConvertToKicad
                 Tedit = "(tedit 0)";
                 Tstamp = "(tstamp 0)";
                 // create the object lists for this component
-                Lines             = new ObjectList<Line>();
+                Lines            = new ObjectList<Line>();
                 Pads             = new ObjectList<Pad>();
                 Strings          = new ObjectList<String>();
                 ViasL            = new ObjectList<Via>();
@@ -114,7 +131,7 @@ namespace ConvertToKicad
                 ID++; // update for next Module
             }
 
-            // constructor for free pads sconverted to modules
+            // constructor for free pads converted to modules
             public Module(string name, double x, double y, double xsize, double ysize, Pad Pad)
             {
                 Name = name;
@@ -126,6 +143,8 @@ namespace ConvertToKicad
                 DesignatorOn = false;
                 Comment = "";
                 CommentOn = false;
+                Locked = false;
+                PrimitiveLock = false;
                 X = x;
                 Y = y;
                 Rotation = 0;
@@ -203,8 +222,11 @@ namespace ConvertToKicad
                                 Attr = "";
 
                     StringBuilder ret = new StringBuilder("");
-                    ret.Append($"  (module \"{Name}\" (layer {Layer}) {Tedit} {Tstamp}\n");
-                    ret.Append($"    (at {X} {-Y} {Rotation})\n");
+                    //X -= Globals.MinX;
+                    //Y -= Globals.MaxY;
+                    string LOCKED = (Locked) ? "locked" : "";
+                    ret.Append($"  (module \"{Name}\" {LOCKED} (layer {Layer}) {Tedit} {Tstamp}\n");
+                    ret.Append($"    (at {X} {-(Y)} {Rotation})\n");
                     if(Attr != "")
                         ret.Append($"    (attr {Attr})\n");
 

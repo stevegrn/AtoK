@@ -5,13 +5,12 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Diagnostics;
 
-
 namespace ConvertToKicad
 {
     public partial class ConvertPCBDoc
     {
         // class for pad objects
-        class Pad : Object
+        class Pad : PCBObject //Object
         {
             public string Number { get; set; }
             public string Type { get; set; }
@@ -25,6 +24,8 @@ namespace ConvertToKicad
             string Layer { get; set; }
             double Width { get; set; }
             double RRatio { get; set; }
+            public double PasteMaskExpansion { get; set; }
+            public double SolderMaskExpansion { get; set; }
             int Net { get; set; }
             string Net_name { get; set; }
             private readonly int Zone_connect;
@@ -45,6 +46,8 @@ namespace ConvertToKicad
                 Net = 0;
                 Net_name = "";
                 RRatio = 0;
+                PasteMaskExpansion = 0;
+                SolderMaskExpansion = 0;
             }
 
             public Pad(string number, string type, string shape, double x, double y, double rotation, double sizex, double sizey, double drill, string layer, int net, double rratio)
@@ -73,7 +76,8 @@ namespace ConvertToKicad
                     Net = 0;
                 Net_name = $"\"{NetsL[Net].Name}\"";
                 // TODO should get this from rules
-                Zone_connect = 1; // default to thermal connect 
+                Zone_connect = 1; // default to thermal connect
+                Component = 0;
             }
 
             public Pad(double XSize, double YSize)
@@ -93,7 +97,7 @@ namespace ConvertToKicad
                 Net_name = "";
             }
 
-            override public string ToString()
+            public override string ToString()
             {
                 if (Shape == "roundrect")
                 {
@@ -108,8 +112,13 @@ namespace ConvertToKicad
                 }
                 else
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {X} {-Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                            $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
+                    string NET = (Net != 0) ? $"(net { Net} { Net_name})" : "";
+                    string PME = (PasteMaskExpansion != 0) ? $"(solder_paste_margin {PasteMaskExpansion}) " : "";
+                    string SME = (SolderMaskExpansion != 0) ? $"(solder_mask_margin {SolderMaskExpansion}) " : "";
+                    string PAD = (PME != "") || (SME != "") || (NET != "")? "      " : "";
+                    return $"    (pad {Number} {Type} {Shape} (at {X} {-Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n"
+                           + PAD + PME + SME + NET +
+                            $" (zone_connect {Zone_connect}))\n";
                 }
             }
 
@@ -165,10 +174,15 @@ namespace ConvertToKicad
 
                 CheckMinMax(p.X, p.Y);
 
+                string NET = (Net != 0) ? $"(net { Net} { Net_name})" : "";
+                string PME = (PasteMaskExpansion != 0) ? $"(solder_paste_margin {PasteMaskExpansion}) " : "";
+                string SME = (SolderMaskExpansion != 0) ? $"(solder_mask_margin {SolderMaskExpansion}) " : "";
+                string PAD = (PME != "") || (SME != "") || (NET != "") ? "      " : "";
                 if (Shape == "roundrect")
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                           $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(X, Precision)} {-Math.Round(Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n"
+                        + PAD + PME + SME + NET +
+                        $" (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
                 }
                 else
                 if (Shape == "octagonal")
@@ -178,8 +192,9 @@ namespace ConvertToKicad
                 }
                 else
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                           $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
+                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n"
+                        + PME + SME +
+                        $"      (net {Net} {Net_name}) (zone_connect {Zone_connect}))\n";
                 }
             }
 
@@ -191,11 +206,15 @@ namespace ConvertToKicad
                 p.Rotate(-ModuleRotation);
 
                 //CheckMinMax(p.X, p.Y);
-
+                string NET = (Net != 0) ? $"(net { Net} { Net_name})" : "";
+                string PME = (PasteMaskExpansion != 0) ? $"(solder_paste_margin {PasteMaskExpansion}) " : "";
+                string SME = (SolderMaskExpansion != 0) ? $"(solder_mask_margin {SolderMaskExpansion}) " : "";
+                string PAD = (PME != "") || (SME != "") || (NET != "") ? "      " : "";
                 if (Shape == "roundrect")
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(p.X, Precision)} {-Math.Round(p.Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                           $"      (net {Net} {Net_name}) (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
+                    return $"    (pad {Number} {Type} {Shape} (at {Math.Round(p.X, Precision)} {-Math.Round(p.Y, Precision)} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n"
+                         + PAD + PME + SME + NET +
+                           $" (roundrect_rratio {RRatio}) (zone_connect {Zone_connect}))\n";
                 }
                 if (Shape == "octagonal")
                 {
@@ -204,8 +223,9 @@ namespace ConvertToKicad
                 }
                 else
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                           $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
+                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n"
+                         + PAD + PME + SME + NET +
+                           $" (zone_connect {Zone_connect}))\n";
                 }
             }
 
@@ -216,10 +236,16 @@ namespace ConvertToKicad
 
                 p.Rotate(-ModuleRotation);
 
+                string NET = (Net != 0) ? $"(net { Net} { Net_name})" : "";
+                string PME = (PasteMaskExpansion != 0) ? $"(solder_paste_margin {PasteMaskExpansion}) " : "";
+                string SME = (SolderMaskExpansion != 0) ? $"(solder_mask_margin {SolderMaskExpansion}) " : "";
+                string PAD = (PME != "") || (SME != "") || (NET != "") ? "      " : "";
+
                 if (Shape != "octagonal")
                 {
-                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation + ModuleRotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n" +
-                           $"      (net {Net} {Net_name})  (zone_connect {Zone_connect}))\n";
+                    return $"    (pad {Number} {Type} {Shape} (at {p.X} {-p.Y} {Rotation + ModuleRotation}) (size {SizeX} {SizeY}) (drill {Drill}) (layers {Layer})\n"
+                         + PAD + PME + SME + NET +
+                           $" (zone_connect {Zone_connect}))\n";
                 }
                 else
                 {
@@ -328,7 +354,7 @@ namespace ConvertToKicad
 
             public override bool ProcessBinaryFile(byte[] data)
             {
-                bool GenerateTxtFile = false; // set to true to generate text version of the file
+                bool GenerateTxtFile = true; // set to true to generate text version of the file
                 FileStream TextFile = null;
                 StartTimer();
                 if (Binary_size == 0)
@@ -475,12 +501,8 @@ namespace ConvertToKicad
                                 Layers Layer;
                                 byte shape;
                                 bool plated;
-                                byte UsePasteMaskRules;
-                                byte UseSolderMaskRules;
                                 double X, Y, XSize, YSize, HoleSize; //, MIDXSize, MIDYSize, BottomXSize, BottomYSize;
                                 double Rotation = 0;
-                                double PasteMaskExpansion;
-                                double SolderMaskExpansion;
                                 double RRatio = 0;
                                 Int16 Net;
                                 Int16 JumperID;
@@ -542,10 +564,6 @@ namespace ConvertToKicad
                                     shape = 4; // oval pad
                                 Rotation = pad.Rotation;
                                 plated = pad.Plated != 0;
-                                PasteMaskExpansion = ToMM(pad.PasteMaskExpansion);
-                                SolderMaskExpansion = ToMM(pad.SolderMaskExpansion);
-                                UsePasteMaskRules = pad.UsePasteMaskRules;
-                                UseSolderMaskRules = pad.UseSolderMaskRules;
                                 JumperID = pad.JumperID;
                                 bool InComponent = Component != -1;
 
@@ -585,7 +603,20 @@ namespace ConvertToKicad
                                     XSize = YSize = HoleSize;
                                 }
 
-                                Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net, RRatio);
+                                Pad Pad = new Pad(name, type, shapes[shape], X, Y, Rotation, XSize, YSize, HoleSize, layer, Net, RRatio)
+                                {
+                                    Component = Component
+                                };
+                                if (pad.UsePasteMaskRules == 1)
+                                    Pad.PasteMaskExpansion = GetRuleValue(Pad, "PasteMaskExpansion", "PasteMaskExpansion");
+                                else
+                                    Pad.PasteMaskExpansion = ToMM(pad.PasteMaskExpansion);
+                                if (pad.UseSolderMaskRules == 1)
+                                    Pad.SolderMaskExpansion = GetRuleValue(Pad, "SolderMaskExpansion", "SolderMaskExpansion");
+                                else
+                                    Pad.SolderMaskExpansion = ToMM(pad.SolderMaskExpansion);
+
+
                                 if (!InComponent)
                                 {
                                     PadsL.Add(Pad);

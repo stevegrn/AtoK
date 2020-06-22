@@ -9,7 +9,7 @@ namespace ConvertToKicad
     public partial class ConvertPCBDoc
     {
         // class for net objects
-        class Net : Object
+        class Net : PCBObject
         {
             private readonly int Number;
             public string Name { get; set; }

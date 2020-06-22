@@ -35,8 +35,8 @@ namespace AtoK
 
         public void UpdateOutput(string s, Color colour)
         {
-            outputList_Add(s, colour);
-            outputList.Update();
+            OutputList_Add(s, colour);
+            OutputList.Update();
         }
 
         public void SetTextEditorLocation(string Location)
@@ -83,7 +83,7 @@ namespace AtoK
             InitializeComponent();
             MaximisedSize = new Size(0, 0);
 
-            outputList_Initialize();
+            OutputList_Initialize();
             FileHistory_Initialize();
             SaveExtractedDocs.CheckState = Properties.Settings.Default.SaveDocs ? CheckState.Checked : CheckState.Unchecked;
             LibraryGen.CheckState        = Properties.Settings.Default.GenLib ? CheckState.Checked : CheckState.Unchecked;
@@ -162,6 +162,8 @@ namespace AtoK
             else
                 FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
 
+            FileHistory.Text = (string)FileHistory.Items[FileHistory.SelectedIndex];
+
             EnableControls();
         }
 
@@ -188,14 +190,14 @@ namespace AtoK
                 // set bottom to bottom of form
                 // set left to left of form
                 // set right to right of form
-                outputList.Width = ClearHistory.Right - SelectSource.Left;
-                outputList.Left = FileHistory.Left;
-                outputList.Top = Verbose.Bottom + 10;
-                outputList.Height = control.Height - Verbose.Bottom - 60;
-                if (outputList.Height < outputList.ItemHeight)
+                OutputList.Width = ClearHistory.Right - SelectSource.Left;
+                OutputList.Left = FileHistory.Left;
+                OutputList.Top = Verbose.Bottom + 10;
+                OutputList.Height = control.Height - Verbose.Bottom - 60;
+                if (OutputList.Height < OutputList.ItemHeight)
                 {
-                    outputList.Height = outputList.ItemHeight;
-                    this.Height = outputList.Bottom + 50;
+                    OutputList.Height = OutputList.ItemHeight;
+                    this.Height = OutputList.Bottom + 50;
                 }
                 MaximisedSize = this.Size;
             }
@@ -221,11 +223,11 @@ namespace AtoK
                 Properties.Settings.Default.F1Location = this.RestoreBounds.Location;
                 Properties.Settings.Default.F1Size = this.RestoreBounds.Size;
             }
-            Properties.Settings.Default.SaveDocs = SaveExtractedDocs.CheckState == CheckState.Checked;
-            Properties.Settings.Default.GenLib = LibraryGen.CheckState == CheckState.Checked;
-            Properties.Settings.Default.Verbose = Verbose.CheckState == CheckState.Checked;
-            Properties.Settings.Default.LastFile = FileHistory.Text;
-            Properties.Settings.Default.PcbnewLocation = PcbnewLocation;
+            Properties.Settings.Default.SaveDocs           = SaveExtractedDocs.CheckState == CheckState.Checked;
+            Properties.Settings.Default.GenLib             = LibraryGen.CheckState == CheckState.Checked;
+            Properties.Settings.Default.Verbose            = Verbose.CheckState == CheckState.Checked;
+            Properties.Settings.Default.LastFile           = FileHistory.Text;
+            Properties.Settings.Default.PcbnewLocation     = PcbnewLocation;
             Properties.Settings.Default.TextEditorLocation = TextEditorLoc;
             SaveFileHistory();
             // don't forget to save the settings
@@ -245,62 +247,62 @@ namespace AtoK
         ContextMenu popUpMenu;
         ContextMenu ComboBoxMenu;
 
-        public void outputList_Add(string Str, Color color)
+        public void OutputList_Add(string Str, Color color)
         {
             Line newLine;
-            Invoke((MethodInvoker)(() => outputList.BeginUpdate()));
+            Invoke((MethodInvoker)(() => OutputList.BeginUpdate()));
             string[] strings = Str.Split('\n');
             foreach (var str in strings)
             {
                 newLine = new Line(str, color);
                 lines.Add(newLine);
                 int testWidth = TextRenderer.MeasureText(str,
-                                                outputList.Font, outputList.ClientSize,
+                                                OutputList.Font, OutputList.ClientSize,
                                                 TextFormatFlags.NoPrefix).Width;
                 if (testWidth > outputlist_width)
                     outputlist_width = testWidth;
 
-                Invoke((MethodInvoker)(() => outputList.HorizontalExtent = outputlist_width));
-                Invoke((MethodInvoker)(() => outputList.Items.Add(newLine)));
-                Invoke((MethodInvoker)(() => outputList_Scroll()));
-                Invoke((MethodInvoker)(() => outputList.EndUpdate()));
+                Invoke((MethodInvoker)(() => OutputList.HorizontalExtent = outputlist_width));
+                Invoke((MethodInvoker)(() => OutputList.Items.Add(newLine)));
+                Invoke((MethodInvoker)(() => OutputList_Scroll()));
+                Invoke((MethodInvoker)(() => OutputList.EndUpdate()));
             }
         }
 
-        public void outputList_Update()
+        public void OutputList_Update()
         {
-            Invoke((MethodInvoker)(() => outputList.Update()));
+            Invoke((MethodInvoker)(() => OutputList.Update()));
         }
 
-        private void outputList_Initialize()
+        private void OutputList_Initialize()
         {
             // owner draw for listbox so we can add color
-            outputList.DrawMode = DrawMode.OwnerDrawFixed;
-            outputList.DrawItem += new DrawItemEventHandler(outputList_DrawItem);
-            outputList.ClearSelected();
+            OutputList.DrawMode = DrawMode.OwnerDrawFixed;
+            OutputList.DrawItem += new DrawItemEventHandler(OutputList_DrawItem);
+            OutputList.ClearSelected();
 
             // build the outputList context menu
             popUpMenu = new ContextMenu();
-            popUpMenu.MenuItems.Add(new MenuItem("Delete selected",  outputList_DeleteSelected, Shortcut.CtrlX));
-            popUpMenu.MenuItems.Add(new MenuItem("Clear All",        outputList_ClearAll));
-            popUpMenu.MenuItems.Add(new MenuItem("Select &All",      outputList_SelectAll,      Shortcut.CtrlA));
-            popUpMenu.MenuItems.Add(new MenuItem("&Copy",            outputList_Copy,           Shortcut.CtrlC));
-            popUpMenu.MenuItems.Add(new MenuItem("Copy All",         outputList_CopyAll));
-            popUpMenu.MenuItems.Add(new MenuItem("Unselect",         outputList_ClearSelected));
-            popUpMenu.MenuItems.Add(new MenuItem("Toggle Scrolling", outputList_ToggleScrolling));
+            popUpMenu.MenuItems.Add(new MenuItem("Delete selected",  OutputList_DeleteSelected, Shortcut.CtrlX));
+            popUpMenu.MenuItems.Add(new MenuItem("Clear All",        OutputList_ClearAll));
+            popUpMenu.MenuItems.Add(new MenuItem("Select &All",      OutputList_SelectAll,      Shortcut.CtrlA));
+            popUpMenu.MenuItems.Add(new MenuItem("&Copy",            OutputList_Copy,           Shortcut.CtrlC));
+            popUpMenu.MenuItems.Add(new MenuItem("Copy All",         OutputList_CopyAll));
+            popUpMenu.MenuItems.Add(new MenuItem("Unselect",         OutputList_ClearSelected));
+            popUpMenu.MenuItems.Add(new MenuItem("Toggle Scrolling", OutputList_ToggleScrolling));
 
             // despite the following the first item in the menu show up as "Clear All    Ctrl+X"
             popUpMenu.MenuItems[0].ShowShortcut = false;
 
-            outputList.ContextMenu = popUpMenu;
+            OutputList.ContextMenu = popUpMenu;
         }
 
-        void outputList_DrawItem(object sender, DrawItemEventArgs e)
+        void OutputList_DrawItem(object sender, DrawItemEventArgs e)
         {
             e.DrawBackground();
-            if (e.Index >= 0 && e.Index < outputList.Items.Count)
+            if (e.Index >= 0 && e.Index < OutputList.Items.Count)
             {
-                Line line = (Line)outputList.Items[e.Index];
+                Line line = (Line)OutputList.Items[e.Index];
 
                 // if selected, make the text color readable
                 Color color = line.ForeColor;
@@ -315,31 +317,31 @@ namespace AtoK
             e.DrawFocusRectangle();
         }
 
-        void outputList_Scroll()
+        void OutputList_Scroll()
         {
             if (scrolling)
             {
-                int itemsPerPage = (int)(outputList.Height / outputList.ItemHeight);
-                outputList.TopIndex = outputList.Items.Count - itemsPerPage;
-                if (outputList.HorizontalScrollbar && (itemsPerPage < outputList.Items.Count))
-                    outputList.TopIndex++;
+                int itemsPerPage = (int)(OutputList.Height / OutputList.ItemHeight);
+                OutputList.TopIndex = OutputList.Items.Count - itemsPerPage;
+                if (OutputList.HorizontalScrollbar && (itemsPerPage < OutputList.Items.Count))
+                    OutputList.TopIndex++;
             }
         }
 
-        private void outputList_SelectedIndexChanged(object sender, EventArgs e)
+        private void OutputList_SelectedIndexChanged(object sender, EventArgs e)
         {
-            popUpMenu.MenuItems[0].Enabled = (outputList.SelectedItems.Count > 0);
+            popUpMenu.MenuItems[0].Enabled = (OutputList.SelectedItems.Count > 0);
         }
 
-        private void outputList_Copy()
+        private void OutputList_Copy()
         {
-            int iCount = outputList.SelectedItems.Count;
+            int iCount = OutputList.SelectedItems.Count;
             if (iCount > 0)
             {
                 String[] source = new String[iCount];
                 for (int i = 0; i < iCount; ++i)
                 {
-                    source[i] = ((Line)outputList.SelectedItems[i]).Str;
+                    source[i] = ((Line)OutputList.SelectedItems[i]).Str;
                 }
 
                 String dest = String.Join("\r\n", source);
@@ -347,20 +349,20 @@ namespace AtoK
             }
         }
 
-        private void outputList_Copy(object sender, EventArgs e)
+        private void OutputList_Copy(object sender, EventArgs e)
         {
-            outputList_Copy();
+            OutputList_Copy();
         }
 
-        private void outputList_CopyAll(object sender, EventArgs e)
+        private void OutputList_CopyAll(object sender, EventArgs e)
         {
-            int iCount = outputList.Items.Count;
+            int iCount = OutputList.Items.Count;
             if (iCount > 0)
             {
                 String[] source = new String[iCount];
                 for (int i = 0; i < iCount; ++i)
                 {
-                    source[i] = ((Line)outputList.Items[i]).Str;
+                    source[i] = ((Line)OutputList.Items[i]).Str;
                 }
 
                 String dest = String.Join("\r\n", source);
@@ -368,29 +370,29 @@ namespace AtoK
             }
         }
 
-        private void outputList_SelectAll(object sender, EventArgs e)
+        private void OutputList_SelectAll(object sender, EventArgs e)
         {
-            outputList.BeginUpdate();
-            for (int i = 0; i < outputList.Items.Count; ++i)
+            OutputList.BeginUpdate();
+            for (int i = 0; i < OutputList.Items.Count; ++i)
             {
-                outputList.SetSelected(i, true);
+                OutputList.SetSelected(i, true);
             }
-            outputList.EndUpdate();
+            OutputList.EndUpdate();
         }
 
-        private void outputList_ClearSelected(object sender, EventArgs e)
+        private void OutputList_ClearSelected(object sender, EventArgs e)
         {
-            outputList.ClearSelected();
-            outputList.SelectedItem = -1;
+            OutputList.ClearSelected();
+            OutputList.SelectedItem = -1;
         }
 
-        private void outputList_DeleteSelected(object sender, EventArgs e)
+        private void OutputList_DeleteSelected(object sender, EventArgs e)
         {
-            outputList.BeginUpdate();
-            var selectedIndices = new List<int>(outputList.SelectedIndices.Cast<int>());
+            OutputList.BeginUpdate();
+            var selectedIndices = new List<int>(OutputList.SelectedIndices.Cast<int>());
             // but first copy selected text to the clipboard
             var Selected = new StringBuilder("");
-            selectedIndices.ForEach(index => Selected.Append(((Line)outputList.Items[index]).Str + "\n"));
+            selectedIndices.ForEach(index => Selected.Append(((Line)OutputList.Items[index]).Str + "\n"));
             String dest = String.Join("\r\n", Selected.ToString());
             if (dest != "")
             {
@@ -398,17 +400,17 @@ namespace AtoK
                 // now delete the items
                 // Remove each item in reverse order to maintain integrity
                 selectedIndices.Reverse();
-                selectedIndices.ForEach(index => outputList.Items.RemoveAt(index));
+                selectedIndices.ForEach(index => OutputList.Items.RemoveAt(index));
 
-                outputList.SelectedItem = -1;
+                OutputList.SelectedItem = -1;
             }
-            outputList.EndUpdate();
+            OutputList.EndUpdate();
         }
 
-        private void outputList_ClearAll(object sender, EventArgs e)
+        private void OutputList_ClearAll(object sender, EventArgs e)
         {
-            outputList.Items.Clear();
-            outputList.SelectedItem = -1;
+            OutputList.Items.Clear();
+            OutputList.SelectedItem = -1;
         }
 
         #endregion
@@ -418,10 +420,10 @@ namespace AtoK
         /// <summary>
 		/// toggle scrolling
 		/// </summary>
-		private void outputList_ToggleScrolling(object sender, EventArgs e)
+		private void OutputList_ToggleScrolling(object sender, EventArgs e)
         {
             scrolling = !scrolling;
-            outputList_Scroll();
+            OutputList_Scroll();
         }
 
         #endregion
@@ -497,7 +499,7 @@ namespace AtoK
                 timer1.Interval = 500;
             }
             else
-                outputList_Add($"File \"{FileHistory.Text}\" doesn't exist", System.Drawing.Color.Red);
+                OutputList_Add($"File \"{FileHistory.Text}\" doesn't exist", System.Drawing.Color.Red);
         }
 
         public void EnableControls()
@@ -567,6 +569,8 @@ namespace AtoK
                     FileHistory.Items.Insert(0, FileHistory.Text);
                     FileHistory.SelectedIndex = 0;
                     FileHistory.Select(FileHistory.Text.Length, 0); // scroll to make filename visible
+                    Properties.Settings.Default.LastFile = FileHistory.Text;
+                    Properties.Settings.Default.Save();
                 }
                 SaveFileHistory();
                 FileHistory.SelectedItem = 0;
@@ -578,6 +582,9 @@ namespace AtoK
         private void Verbose_Click(object sender, EventArgs e)
         {
             ConvertPCBDoc.Verbose = Verbose.Checked;
+            Properties.Settings.Default.Verbose = Verbose.CheckState == CheckState.Checked;
+            // don't forget to save the settings
+            Properties.Settings.Default.Save();
         }
 
         private void timer1_Tick(object sender, EventArgs e)
@@ -597,18 +604,21 @@ namespace AtoK
                 busy.Hide();
                 button1.BackColor = Color.FromArgb(224, 224, 224);
                 this.Update();
-                if (Globals.ReportLines != 0)
+                if (Globals.ReportLines != 0 && Properties.Settings.Default.ShowWarningsDialog)
                 {
                     if (File.Exists(Form1.TextEditorLoc))
                     {
                         if (ShowWarnings() == DialogResult.OK)
                         {
-                            var p = new Process();
-
-                            p.StartInfo = new ProcessStartInfo(Form1.TextEditorLoc, "\"" + Globals.ReportFilename + "\"");
-                            p.StartInfo.RedirectStandardOutput = false;
-                            p.StartInfo.RedirectStandardError = true;
-                            p.StartInfo.UseShellExecute = false;
+                            var p = new Process
+                            {
+                                StartInfo = new ProcessStartInfo(Form1.TextEditorLoc, "\"" + Globals.ReportFilename + "\"")
+                                {
+                                    RedirectStandardOutput = false,
+                                    RedirectStandardError = true,
+                                    UseShellExecute = false
+                                }
+                            };
                             p.Start();
                         }
                     }
@@ -649,10 +659,12 @@ namespace AtoK
                         {
                             if (File.Exists(PcbnewLocation))
                             {
-                                p.StartInfo = new ProcessStartInfo(PcbnewLocation, "\"" + output_filename + "\"");
-                                p.StartInfo.RedirectStandardOutput = false;
-                                p.StartInfo.RedirectStandardError = true;
-                                p.StartInfo.UseShellExecute = false;
+                                p.StartInfo = new ProcessStartInfo(PcbnewLocation, "\"" + output_filename + "\"")
+                                {
+                                    RedirectStandardOutput = false,
+                                    RedirectStandardError = true,
+                                    UseShellExecute = false
+                                };
                                 p.Start();
                             }
                         }
@@ -709,8 +721,10 @@ namespace AtoK
 
         private void CleanUp_Click(object sender, EventArgs e)
         {
-            var Clean = new CleanUp();
-            Clean.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
+            var Clean = new CleanUp
+            {
+                StartPosition = System.Windows.Forms.FormStartPosition.Manual
+            };
             Clean.Location = new System.Drawing.Point((this.Location.X + this.Width / 2) - (Clean.Width / 2), (this.Location.Y + this.Height / 2) - (Clean.Height / 2));
             Clean.ShowDialog();
             switch (CleanFlag)
@@ -748,10 +762,12 @@ namespace AtoK
                         {
                             if (File.Exists(TextEditorLoc))
                             {
-                                p.StartInfo = new ProcessStartInfo(TextEditorLoc, "\"" + output_filename + "\"");
-                                p.StartInfo.RedirectStandardOutput = false;
-                                p.StartInfo.RedirectStandardError = true;
-                                p.StartInfo.UseShellExecute = false;
+                                p.StartInfo = new ProcessStartInfo(TextEditorLoc, "\"" + output_filename + "\"")
+                                {
+                                    RedirectStandardOutput = false,
+                                    RedirectStandardError = true,
+                                    UseShellExecute = false
+                                };
                                 p.Start();
                             }
                         }
@@ -816,7 +832,7 @@ namespace AtoK
 
         private void FileHistory_SelectedIndexChanged(object sender, EventArgs e)
         {
-            FileHistory.Text = FileHistory.Text;
+            FileHistory.Text = (string)FileHistory.Items[FileHistory.SelectedIndex];
             Properties.Settings.Default.ComboBoxIndex = FileHistory.SelectedIndex;
             Properties.Settings.Default.Save();
             CheckOutputDir();
@@ -863,8 +879,10 @@ namespace AtoK
 
         private void Options_Click(object sender, EventArgs e)
         {
-            var OptionsForm = new Options();
-            OptionsForm.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
+            var OptionsForm = new Options
+            {
+                StartPosition = System.Windows.Forms.FormStartPosition.Manual
+            };
             OptionsForm.Location = new System.Drawing.Point((this.Location.X + this.Width / 2) - (OptionsForm.Width / 2), (this.Location.Y + this.Height / 2) - (OptionsForm.Height / 2));
             OptionsForm.ShowDialog();
             EnableControls();
@@ -872,8 +890,10 @@ namespace AtoK
 
         public DialogResult ShowWarnings()
         {
-            var Form = new Warnings();
-            Form.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
+            var Form = new Warnings
+            {
+                StartPosition = System.Windows.Forms.FormStartPosition.Manual
+            };
             Form.Location = new System.Drawing.Point((this.Location.X + this.Width / 2) - (Form.Width / 2), (this.Location.Y + this.Height / 2) - (Form.Height / 2));
             return Form.ShowDialog();
         }
@@ -883,7 +903,7 @@ namespace AtoK
             char key = e.KeyChar;
             switch((int)key)
             {
-                case 3: outputList_Copy(); break;
+                case 3: OutputList_Copy(); break;
                 default: break;
             }
         }

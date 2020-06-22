@@ -145,7 +145,7 @@ namespace AtoK.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
         public int ComboBoxIndex {
             get {
                 return ((int)(this["ComboBoxIndex"]));
@@ -188,6 +188,42 @@ namespace AtoK.Properties {
             }
             set {
                 this["TextEditorLocation"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool PcbnewVersion {
+            get {
+                return ((bool)(this["PcbnewVersion"]));
+            }
+            set {
+                this["PcbnewVersion"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowWarningsDialog {
+            get {
+                return ((bool)(this["ShowWarningsDialog"]));
+            }
+            set {
+                this["ShowWarningsDialog"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ReportFile {
+            get {
+                return ((bool)(this["ReportFile"]));
+            }
+            set {
+                this["ReportFile"] = value;
             }
         }
     }

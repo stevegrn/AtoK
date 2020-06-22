@@ -1,27 +1,34 @@
 ﻿using System;
 using System.Windows.Forms;
 using System.IO;
+using ConvertToKicad;
 
 namespace AtoK
 {
     public partial class Options : Form
     {
+        public bool Pcbnew515;
+
         public Options()
         {
             InitializeComponent();
 
             PcbnewLocation.Text     = Properties.Settings.Default.PcbnewLocation;
             TextEditorLocation.Text = Properties.Settings.Default.TextEditorLocation;
+            PcbnewVersion.Checked   = Properties.Settings.Default.PcbnewVersion;
+            Globals.PcbnewVersion   = PcbnewVersion.Checked;
         }
 
         private void PcbNew_Click(object sender, EventArgs e)
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.InitialDirectory = Form1.PcbnewLocation!=""?Path.GetDirectoryName(Form1.PcbnewLocation):"C:\\";
-            openFileDialog.Filter = "PcbNew (pcbnew.exe)|pcbnew.exe|All files (*.*)|*.*";
-            openFileDialog.FilterIndex = 1;
-            openFileDialog.FileName = Path.GetFileName(Form1.PcbnewLocation);
-            openFileDialog.RestoreDirectory = true;
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                InitialDirectory = Form1.PcbnewLocation != "" ? Path.GetDirectoryName(Form1.PcbnewLocation) : "C:\\",
+                Filter = "PcbNew (pcbnew.exe)|pcbnew.exe|All files (*.*)|*.*",
+                FilterIndex = 1,
+                FileName = Path.GetFileName(Form1.PcbnewLocation),
+                RestoreDirectory = true
+            };
 
             string test = PcbnewLocation.Text;
             DialogResult result = openFileDialog.ShowDialog(); // Show the dialog.
@@ -40,12 +47,14 @@ namespace AtoK
 
         private void TextEditor_Click(object sender, EventArgs e)
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.InitialDirectory = Form1.TextEditorLoc != "" ? Path.GetDirectoryName(Form1.TextEditorLoc) : "C:\\";
-            openFileDialog.Filter = "All files (*.exe)|*.*";
-            openFileDialog.FilterIndex = 1;
-            openFileDialog.RestoreDirectory = true;
-            openFileDialog.FileName = Path.GetFileName(Form1.TextEditorLoc);
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                InitialDirectory = Form1.TextEditorLoc != "" ? Path.GetDirectoryName(Form1.TextEditorLoc) : "C:\\",
+                Filter = "All files (*.exe)|*.*",
+                FilterIndex = 1,
+                RestoreDirectory = true,
+                FileName = Path.GetFileName(Form1.TextEditorLoc)
+            };
             DialogResult result = openFileDialog.ShowDialog(); // Show the dialog.
             if (result == DialogResult.OK) // Test result.
             {
@@ -69,7 +78,10 @@ namespace AtoK
             PcbnewLocation.Items.Add(Form1.PcbnewLocation);
             TextEditorLocation.Items.Clear();
             TextEditorLocation.Items.Add(Form1.TextEditorLoc);
-
+            PcbnewVersion.Checked = Properties.Settings.Default.PcbnewVersion;
+            ShowWarnings.Checked  = Properties.Settings.Default.ShowWarningsDialog;
+            ReportFile.Checked = Properties.Settings.Default.ReportFile;
+            Globals.PcbnewVersion = PcbnewVersion.Checked;
         }
 
         private void CANCEL_Click(object sender, EventArgs e)
@@ -83,10 +95,15 @@ namespace AtoK
             Properties.Settings.Default.PcbnewLocation     = PcbnewLocation.Text;
             Properties.Settings.Default.TextEditorLocation = TextEditorLocation.Text;
             Properties.Settings.Default.Save();
+            Properties.Settings.Default.PcbnewVersion = PcbnewVersion.Checked;
+            Properties.Settings.Default.ShowWarningsDialog = ShowWarnings.Checked;
+            Globals.PcbnewVersion = PcbnewVersion.Checked;
+            Properties.Settings.Default.ReportFile = ReportFile.Checked;
+            Properties.Settings.Default.Save();
 
             Form1.PcbnewLocation = PcbnewLocation.Text;
             Form1.TextEditorLoc  = TextEditorLocation.Text;
-            this.DialogResult = DialogResult.OK;
+            this.DialogResult    = DialogResult.OK;
             this.Close();
         }
 
@@ -117,6 +134,14 @@ namespace AtoK
                 PcbnewLocation.Text = "";
                 Update();
             }
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+        }
+
+        private void PcbnewVersion_Click(object sender, EventArgs e)
+        {
         }
     }
 }

@@ -75,22 +75,40 @@ namespace ConvertToKicad
 
             public class Layer
             {
-                public string Name { get; set; }
-                public int Prev { get; set; }
-                public int Next { get; set; }
-                public bool MechEnabled { get; set; }
-                public double CopperThickness { get; set; }
-                public int DielectricType { get; set; }
+                public string Name               { get; set; }
+                public int    Prev               { get; set; }
+                public int    Next               { get; set; }
+                public bool   MechEnabled        { get; set; }
+                public double CopperThickness    { get; set; }
+                public int    DielectricType     { get; set; }
                 public double DielectricConstant { get; set; }
-                public double DielectricHeight { get; set; }
+                public double DielectricHeight   { get; set; }
                 public string DielectricMaterial { get; set; }
-                public int Number { get; set; }
-                public string PcbNewLayer { get; set; }
-                public string AltiumName { get; set; }
+                public int    Number             { get; set; }
+                public string PcbNewLayer        { get; set; }
+                public string AltiumName         { get; set; }
+                public bool   SplitPlane         { get; set; }
+                public string PlaneNetName       { get; set; }
 
                 public Layer(string line, int number)
                 {
+                    string[] words = line.Split('|');
+                    int i = 0;
+                    foreach(var s in words)
+                    {
+                        if (s.Contains("InternalPlane"))
+                            break;
+                        i++;
+                    }
                     Name               = GetString(line, $"LAYER{number}NAME=");
+                    PlaneNetName = "";
+                    if(Name.Contains("InternalPlane"))
+                    {
+                        // this is a plane
+                        string PlaneNumber = Name.Substring("InternalPlane".Length);
+                        PlaneNetName = GetString(line, $"PLANE{PlaneNumber}NETNAME=");
+                        SplitPlane = PlaneNetName == "(Multiple Nets)";
+                    }
                     Prev               = Convert.ToInt16(GetString(line, $"LAYER{number}PREV="));
                     Next               = Convert.ToInt16(GetString(line, $"LAYER{number}NEXT="));
                     MechEnabled        = GetString(line, $"LAYER{number}MECHENABLED=") == "TRUE";
@@ -118,6 +136,7 @@ namespace ConvertToKicad
             public double OriginY { get; set; }
             public bool DesignatorDisplayMode { get; set; }
             public int InnerLayerCount { get; set; }
+            public int MaxPourIndex { get; set; }
             public List<Layer> LayersL;
             public List<Layer> OrderedLayers;
 
@@ -130,6 +149,7 @@ namespace ConvertToKicad
                 LayersL = new List<Layer>();
                 OrderedLayers = new List<Layer>();
                 BoundaryObjects = new List<BoundaryObject>();
+                MaxPourIndex = 0;
             }
 
             public void BoardAddLine(double x1, double y1, double x2, double y2)
@@ -184,6 +204,7 @@ namespace ConvertToKicad
                 base.ProcessLine();
                 try
                 {
+                    string[] words = line.Split('|');
                     InnerLayerCount = 0;
                     string ORIGINX = GetString(line, "ORIGINX=");
                     string ORIGINY = GetString(line, "ORIGINY=");
@@ -192,8 +213,8 @@ namespace ConvertToKicad
                     if (ORIGINY != "")
                         OriginY = originY = GetCoordinateY(GetString(line, "ORIGINY="));
                     OutputString($"ORIGINX={OriginX} ORIGINY={OriginY}");
-                    originX = 0;
-                    originY = 0;
+                    //originX = 0;
+                    //originY = 0;
                     if (ORIGINX != "" && ORIGINY != "")
                     {
                         var strings = new List<string>();
@@ -430,7 +451,7 @@ namespace ConvertToKicad
                     case "TOPOVERLAY":    return "F.SilkS";
                     case "BOTTOMOVERLAY": return "B.SilkS";
                     case "KEEPOUT":       return "Margin";
-                    case "MECHANICAL1":   return "Edge.Cuts";
+                    case "MECHANICAL1":   return "Dwgs.User";  //"Edge.Cuts";
                     case "MECHANICAL2":   return "Dwgs.User";
                     case "MECHANICAL3":   return "Dwgs.User";
                     case "MECHANICAL4":   return "Dwgs.User";
@@ -454,7 +475,6 @@ namespace ConvertToKicad
                     case "DRILLGUIDE":    return "Dwgs.User";
                     default: return AltiumLayer;
                 }
-                return layer;
             }
 
             public bool IsCopperLayer(Layers AltiumLayer)
@@ -468,7 +488,6 @@ namespace ConvertToKicad
                         return true;
                     }
                 }
-
                 return false;
             }
             /*
@@ -557,6 +576,15 @@ namespace ConvertToKicad
                 return Layers;
             }
 
+            public Layers GetAltiumLayer(string PcbnewLayer)
+            {
+                foreach(var L in LayersL)
+                {
+                    if (L.PcbNewLayer == PcbnewLayer)
+                        return (Layers)L.Number;
+                }
+                return Layers.No_Layer;
+            }
         }
     }
 }

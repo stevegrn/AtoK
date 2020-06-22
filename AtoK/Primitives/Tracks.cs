@@ -9,15 +9,17 @@ namespace ConvertToKicad
     public partial class ConvertPCBDoc
     {
         // class for track objects
-        class Line : Object
+        class Line : PCBObject
         {
             double X1 { get; set; }
             double Y1 { get; set; }
             double X2 { get; set; }
             double Y2 { get; set; }
-            Layers Layer { get; set; }
+            string Layer { get; set; }
             double Width { get; set; }
             bool Segment { get; set; }
+            int Net { get; set; }
+            bool InComponent { get; set; }
 
             private Line()
             {
@@ -25,11 +27,24 @@ namespace ConvertToKicad
                 Y1 = 0;
                 X2 = 0;
                 Y2 = 0;
-                Layer = 0;
+                Layer = "";
                 Width = 0;
+                InComponent = false;
             }
 
-            public Line(double x1, double y1, double x2, double y2, Layers layer, double width, bool segment)
+            public Line(double x1, double y1, double x2, double y2, string layer, double width)
+            {
+                X1 = Math.Round(x1, Precision);
+                Y1 = Math.Round(y1, Precision);
+                X2 = Math.Round(x2, Precision);
+                Y2 = Math.Round(y2, Precision);
+                Layer = layer;
+                Width = Math.Round(width, Precision);
+                Net = 0;
+                InComponent = true;
+            }
+
+            public Line(double x1, double y1, double x2, double y2, string layer, double width, int net)
             {
                 X1 = x1;
                 Y1 = y1;
@@ -37,7 +52,26 @@ namespace ConvertToKicad
                 Y2 = y2;
                 Layer = layer;
                 Width = width;
-                Segment = segment;
+                Net = net;
+                InComponent = false;
+            }
+
+            public override string ToString()
+            {
+                track_count++;
+                string type;
+                string net;
+                if (Net == 0)
+                {
+                    net = "";
+                    type = "gr_line";
+                }
+                else
+                {
+                    net = $"(net {Net})";
+                    type = "segment";
+                }
+                return $"  ({type} (start {X1} {-Y1}) (end {X2} {-Y2}) (width {Width}) (layer {Layer}) {net})\n";
             }
 
             public string ToString(double x, double y)
@@ -47,7 +81,7 @@ namespace ConvertToKicad
                 Point2D p2 = new Point2D(X2 - x, Y2 - y);
 
                 // create line relative to component origin
-                return $"    (fp_line (start {p1.X} {-p1.Y}) (end {p2.X} {-p2.Y}) (layer {Brd.GetLayer(Layer)}) (width {Width}))\n";
+                return $"    (fp_line (start {p1.X} {-p1.Y}) (end {p2.X} {-p2.Y}) (layer {Layer}) (width {Width}))\n";
             }
 
             public override string ToString(double x, double y, double ModuleRotation)
@@ -60,8 +94,7 @@ namespace ConvertToKicad
                 p2.Rotate(ModuleRotation);
 
                 // create line relative to component origin
-                string type = Segment ? "segment" : "fp_line";
-                return $"    ({type} (start {p1.X} {-p1.Y}) (end {p2.X} {-p2.Y}) (layer {Brd.GetLayer(Layer)}) (width {Width}))\n";
+                 return $"    (fp_line (start {p1.X} {-p1.Y}) (end {p2.X} {-p2.Y}) (layer {Layer}) (width {Width}))\n";
             }
         }
 
@@ -126,22 +159,23 @@ namespace ConvertToKicad
                                 List<string> Layers = Brd.GetLayers(Layer);
                                 foreach (var L in Layers)
                                 {
-                                    tracks.Append($"  (gr_line (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {L}))\n");
-                                    track_count++;
+                                    Line Line = new Line(X1, Y1, X2, Y2, L, width, net);
+                                    LinesL.Add(Line);
                                 }                              
                             }
                         }
                     }
                     else
                     {
-                        Line Line = new Line(X1, Y1, X2, Y2, layer, width, true);
-                        tracks.Append($"  (segment (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}) (net {net}))\n");
-                        track_count++;
+                        Line Line = new Line(X1, Y1, X2, Y2, Brd.GetLayer(layer), width, net);
+                        LinesL.Add(Line);
+                        //tracks.Append($"  (segment (start {X1} {-Y1}) (end {X2} {-Y2}) (width {width}) (layer {Layer}) (net {net}))\n");
+                        //track_count++;
                     }
                 }
                 else
                 {
-                    Line Line = new Line(X1, Y1, X2, Y2, layer, width, false);
+                    Line Line = new Line(X1, Y1, X2, Y2, Brd.GetLayer(layer), width);
                     ModulesL[ComponentNumber].Lines.Add(Line);
                 }
                 return true;

@@ -9,8 +9,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using AtoK;
 using System.Threading;
-using System.Windows.Forms;
-using System.Drawing;
 
 namespace ConvertToKicad
 {
@@ -19,6 +17,7 @@ namespace ConvertToKicad
         static public string ReportFilename;
         static public int ReportLines;
         static public double MinX, MinY, MaxX, MaxY;
+        static public bool PcbnewVersion;
     }
 
     public partial class ConvertPCBDoc
@@ -44,16 +43,18 @@ namespace ConvertToKicad
         static FileVersionInfo FV;
         static ObjectList<Net>       NetsL;
         static ObjectList<Module>    ModulesL;
+        static ObjectList<String>    Strings;
         static ObjectList<Polygon>   PolygonsL;
         static ObjectList<Line>      LinesL;
         static ObjectList<Pad>       PadsL;
-        static ObjectList<String>    Strings;
         static ObjectList<Via>       ViasL;
         static ObjectList<Fill>      FillsL;
         static ObjectList<Dimension> DimensionsL;
         static ObjectList<Rule>      RulesL;
         static ObjectList<Region>    RegionsL;
         static ObjectList<Line>      Segments;
+        static ObjectList<Arc>       ArcsL;
+        static List<RuleKind>        RuleKindsL;
         static Stopwatch StopWatch;
         static double originX = 0;
         static double originY = 0;
@@ -279,7 +280,8 @@ namespace ConvertToKicad
             Mech_16 = 72,
 
             Drill_Drawing = 73,
-            Multi_Layer = 74
+            Multi_Layer = 74,
+            No_Layer = 75
         }
 
         // Altium layer names
@@ -705,7 +707,7 @@ namespace ConvertToKicad
         }
 
         // class for creating lists of objects
-        class ObjectList<T> : List<T> where T : Object
+        class ObjectList<T> : List<T> where T : PCBObject
         {
 
             public ObjectList() : base()
@@ -973,8 +975,8 @@ namespace ConvertToKicad
             {
                 if (Verbose)
                 {
-                    Program.Form.outputList_Add(text, System.Drawing.Color.Black);
-                    Program.Form.outputList_Update();
+                    Program.Form.OutputList_Add(text, System.Drawing.Color.Black);
+                    Program.Form.OutputList_Update();
                 }
             }
         }
@@ -993,8 +995,8 @@ namespace ConvertToKicad
                     ReportFile.WriteLine(text);
                 else
                 {
-                    Program.Form.outputList_Add(text, System.Drawing.Color.Red);
-                    Program.Form.outputList_Update();
+                    Program.Form.OutputList_Add(text, System.Drawing.Color.Red);
+                    Program.Form.OutputList_Update();
                 }
             }
         }
@@ -1008,8 +1010,8 @@ namespace ConvertToKicad
             }
             else
             {
-                Program.Form.outputList_Add(text, System.Drawing.Color.Red);
-                Program.Form.outputList_Update();
+                Program.Form.OutputList_Add(text, System.Drawing.Color.Red);
+                Program.Form.OutputList_Update();
             }
         }
 
@@ -1041,7 +1043,7 @@ namespace ConvertToKicad
             arcs        = new StringBuilder("");
             fills       = new StringBuilder("");
             keepouts    = new StringBuilder("");
-            StopWatch = new Stopwatch();
+            StopWatch   = new Stopwatch();
             Globals.ReportLines = 0;
 
             StopWatch.Start();
@@ -1062,6 +1064,8 @@ namespace ConvertToKicad
                 ShapeBasedMods = new ShapeBasedModels();
                 RegionsL       = new ObjectList<Region>();
                 Segments       = new ObjectList<Line>();
+                ArcsL          = new ObjectList<Arc>();
+                RuleKindsL     = new List<RuleKind>();
 
                 Globals.MinX = Double.MaxValue;
                 Globals.MinY = Double.MaxValue;
@@ -1148,13 +1152,13 @@ namespace ConvertToKicad
                     new Nets                     ("Nets6",                        "35D7CF51BB9B4875B3A138B32D80DC", "Net",                      Type.text,   4),
                     new DifferentialPairs        ("DifferentialPairs6",           "17DC1EE78CF64F22A78C16A208DE80", "DifferentialPair",         Type.text,   4),
                     new Components               ("Components6",                  "F9D060ACC7DD4A85BC73CB785BAC81", "Component",                Type.text,   4),
+                    new Texts                    ("Texts6",                       "A34BC67C2A5F408D8F377378C5C5E2", "Text",                     Type.binary, 4),
                     new Polygons                 ("Polygons6",                    "A1931C8B0B084A61AA45146575FDD3", "Polygon",                  Type.text,   4),
                     new Dimensions               ("Dimensions6",                  "068B9422DBB241258BA2DE9A6BA1A6", "Embedded",                 Type.text,   6),
                     new Arcs                     ("Arcs6",                        "1CEEB63FB33847F8AFC4485F64735E", "Arc",                      Type.binary, 4),
                     new Pads                     ("Pads6",                        "4F501041A9BC4A06BDBDAB67D3820E", "Pad",                      Type.binary, 4),
                     new Vias                     ("Vias6",                        "C87A685A0EFA4A90BEEFD666198B56", "Via",                      Type.binary, 4),
                     new Tracks                   ("Tracks6",                      "412A754DBB864645BF01CD6A80C358", "Track",                    Type.binary, 4),
-                    new Texts                    ("Texts6",                       "A34BC67C2A5F408D8F377378C5C5E2", "Text",                     Type.binary, 4),
                     new Fills                    ("Fills6",                       "6FFE038462A940E9B422EFC8F5D85E", "Fill",                     Type.binary, 4),
                     new Regions                  ("Regions6",                     "F513A5885418472886D3EF18A09E46", "Region",                   Type.binary, 4),
                     new Models6                  ("Models",                       "0DB009C021D946C88F1B3A32DAE94B", "ComponentBody",            Type.text,   4),
@@ -1202,7 +1206,8 @@ namespace ConvertToKicad
                 Directory.SetCurrentDirectory(UnpackDirectory);
                 string cd = Directory.GetCurrentDirectory();
                 Globals.ReportFilename = cd + "\\Report.txt";
-                ReportFile = File.CreateText("Report.txt");
+                if(AtoK.Properties.Settings.Default.ReportFile)
+                    ReportFile = File.CreateText("Report.txt");
 
                 IList<IDirectoryEntry> entries = cf.GetDirectories();
                 if (MakeDir(cf.RootStorage.Name))
@@ -1276,17 +1281,17 @@ namespace ConvertToKicad
                     OutFile.WriteLine("    (area 0 0 0 0)");
                     OutFile.WriteLine("    (thickness 1.6)");
                     OutFile.WriteLine("    (drawings 0)");
-                    OutFile.WriteLine($"    (tracks {track_count})");
+                    OutFile.WriteLine($"    (tracks {LinesL.Count})");
                     OutFile.WriteLine($"    (zones {PolygonsL.Count})");
                     OutFile.WriteLine($"    (modules {ModulesL.Count})");
                     OutFile.WriteLine($"    (nets {NetsL.Count})");
                     OutFile.WriteLine("  )");
                     OutFile.WriteLine("");
-                    Globals.MinX -= 10;
-                    Globals.MaxX += 10;
-                    Globals.MinY -= 10;
-                    Globals.MaxY += 10;
-                    OutFile.WriteLine($"  (page \"User\" {Globals.MaxX - Globals.MinX + 20} {Globals.MaxY - Globals.MinY + 20})");
+                    Globals.MinX -= 20;
+                    Globals.MaxX += 20;
+                    Globals.MinY -= 20 + 34;
+                    Globals.MaxY += 20;
+                    OutFile.WriteLine($"  (page \"User\" {Globals.MaxX - Globals.MinX} {Globals.MaxY - Globals.MinY})");
                     OutFile.WriteLine("  (layers");
                     // output the layer stack
                     OutFile.WriteLine(Brd.ToString());
@@ -1374,17 +1379,19 @@ namespace ConvertToKicad
                 // PadsL.ToString(); N.B. KiCad doesn't allow free standing pads yet ...TODO create modules to do this
                 OutFile.WriteLine(PolygonsL.ToString());
                 OutFile.WriteLine(ViasL.ToString());
-                OutFile.WriteLine(tracks.ToString());
+                OutFile.WriteLine(LinesL.ToString());
                 OutFile.WriteLine(arcs.ToString());
+                OutFile.WriteLine(ArcsL.ToString());
                 OutFile.WriteLine(texts.ToString());
                 OutFile.WriteLine(fills.ToString());
                 OutFile.WriteLine(keepouts.ToString());
                 OutFile.WriteLine(DimensionsL.ToString());
                 OutFile.WriteLine(RegionsL.ToString());
-                OutFile.WriteLine($"(gr_line(start {Globals.MinX} { -Globals.MinY}) (end {Globals.MaxX} { -Globals.MinY}) (width {0.5}) (layer \"Eco1.User\"))\n");
-                OutFile.WriteLine($"(gr_line(start {Globals.MaxX} { -Globals.MinY}) (end {Globals.MaxX} { -Globals.MaxY}) (width {0.5}) (layer \"Eco1.User\"))\n");
-                OutFile.WriteLine($"(gr_line(start {Globals.MaxX} { -Globals.MaxY}) (end {Globals.MinX} { -Globals.MaxY}) (width {0.5}) (layer \"Eco1.User\"))\n");
-                OutFile.WriteLine($"(gr_line(start {Globals.MinX} { -Globals.MaxY}) (end {Globals.MinX} { -Globals.MinY}) (width {0.5}) (layer \"Eco1.User\"))\n");
+                // draw outline of bounding box
+//                OutFile.WriteLine($"(gr_line(start {Globals.MinX} { -Globals.MinY}) (end {Globals.MaxX} { -Globals.MinY}) (width {0.5}) (layer \"Eco1.User\"))\n");
+//                OutFile.WriteLine($"(gr_line(start {Globals.MaxX} { -Globals.MinY}) (end {Globals.MaxX} { -Globals.MaxY}) (width {0.5}) (layer \"Eco1.User\"))\n");
+//                OutFile.WriteLine($"(gr_line(start {Globals.MaxX} { -Globals.MaxY}) (end {Globals.MinX} { -Globals.MaxY}) (width {0.5}) (layer \"Eco1.User\"))\n");
+//                OutFile.WriteLine($"(gr_line(start {Globals.MinX} { -Globals.MaxY}) (end {Globals.MinX} { -Globals.MinY}) (width {0.5}) (layer \"Eco1.User\"))\n");
                 OutFile.WriteLine(")");
 
                 OutFile.Close();
@@ -1457,7 +1464,8 @@ namespace ConvertToKicad
                     }
                 }
                 cf.Close();
-                ReportFile.Close();
+                if(ReportFile != null)
+                    ReportFile.Close();
                 Directory.SetCurrentDirectory("..\\");
                 OutputString($"Finished time taken = {GetTimeString(StopWatch.ElapsedMilliseconds)}");
             }

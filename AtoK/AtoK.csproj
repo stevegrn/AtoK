@@ -105,6 +105,7 @@
     </Compile>
     <Compile Include="Board\Board.cs" />
     <Compile Include="Board\FileVersionInfo.cs" />
+    <Compile Include="BooleanExpression.cs" />
     <Compile Include="CleanUp.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -150,6 +151,7 @@
     <Compile Include="Primitives\Models.cs" />
     <Compile Include="Primitives\Nets.cs" />
     <Compile Include="Primitives\Pads.cs" />
+    <Compile Include="Primitives\PcbObject.cs" />
     <Compile Include="Primitives\Polygons.cs" />
     <Compile Include="Primitives\Regions.cs" />
     <Compile Include="Primitives\Rules.cs" />

@@ -9,7 +9,7 @@ namespace ConvertToKicad
     public partial class ConvertPCBDoc
     {
         // class for component body objects
-        class ComponentBody : Object
+        class ComponentBody : PCBObject
         {
             public string ID;
             public string Identifier;
@@ -20,6 +20,7 @@ namespace ConvertToKicad
             public double X, Y;
             public double Model3dRotX, Model3dRotY, Model3dRotZ;
             public double TextureRotation;
+            public double Opacity;
             public string BodyLayer;
 
             ComponentBody()
@@ -56,6 +57,10 @@ namespace ConvertToKicad
                     Model3dRotZ = GetDouble(GetString(line, "MODEL.3D.ROTZ="));       // rotation about z for 3d model
                     TextureRotation = GetDouble(GetString(line, "TEXTUREROTATION="));     // yet another rotation
                     BodyLayer = GetString(line, "BODYPROJECTION=");
+                    string O = GetString(line, "BODYOPACITY3D=");
+                    if (O == "")
+                        O = "1.0";
+                    Opacity = GetDouble(O);
                 }
                 catch(Exception Ex)
                 {
@@ -63,7 +68,7 @@ namespace ConvertToKicad
                 }
             }
 
-            public override string ToString(double x, double y, double modulerotation)
+            public string ToString(double x, double y, double modulerotation)
             {
                 string FileName = Mods.GetFilename(ID).ToLower();
 
@@ -92,13 +97,21 @@ namespace ConvertToKicad
                         Model3dRotY = Model3dRotY - 180;
                     }
 
-                    return $"    (model \"$(KIPRJMOD)/Models/{FileName}\"\n"
-                         + $"        (offset (xyz {p.X} {p.Y} {StandoffHeight}))\n"
-                         + $"        (scale (xyz {1} {1} {1}))\n"
-                         + $"        (rotate (xyz {-Model3dRotX} {-Model3dRotY} {-ModRotZ}))\n    )\n";
+                    var ret = new StringBuilder("");
+
+                    ret.Append($"    (model \"$(KIPRJMOD)/Models/{FileName}\"\n");
+                    if (Opacity < 1)
+                    {
+                        if(!Globals.PcbnewVersion)
+                            ret.Append($"        (opacity {Opacity})\n"); // in Pcbnew 5.99
+                    }
+                    ret.Append($"        (offset (xyz {p.X} {p.Y} {StandoffHeight}))\n");
+                    ret.Append($"        (scale (xyz {1} {1} {1}))\n");
+                    ret.Append($"        (rotate (xyz {-Model3dRotX} {-Model3dRotY} {-ModRotZ}))\n    )\n");
+                    return ret.ToString();
                 }
 
-                return $"# ID={ID} Checksum = {Checksum} StandoffHeight={StandoffHeight} OverallHeight={OverallHeight} x={X - x} y={-(Y - y)} rotx={Model3dRotX} roty={Model3dRotY} rotz={Model3dRotZ}\n";
+                return ""; // $"# ID={ID} Checksum = {Checksum} StandoffHeight={StandoffHeight} OverallHeight={OverallHeight} x={X - x} y={-(Y - y)} rotx={Model3dRotX} roty={Model3dRotY} rotz={Model3dRotZ}\n";
             }
         }
 

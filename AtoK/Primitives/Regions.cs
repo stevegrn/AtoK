@@ -3,15 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Linq;
 
 namespace ConvertToKicad
 {
     public partial class ConvertPCBDoc
     {
         // class for region objects
-        class Region : Object
+        class Region : PCBObject
         {
-            List<Point> Points;
+            public List<Point> Points { get; set; }
             int Net_no { get; set; }
             string Net_name { get; set; }
             string Layer { get; set; }
@@ -20,6 +21,7 @@ namespace ConvertToKicad
             public bool PolygonCutout { get; set; }
             public bool BoardCutout { get; set; }
             short Flags { get; set; }
+            public Int16 SubPolyIndex { get; set; }
 
             public void AddPoint(double X, double Y)
             {
@@ -34,6 +36,12 @@ namespace ConvertToKicad
 
             public Region(string layer, int net, Int16 flags, string line)
             {
+                string[] words = line.Split('|');
+                Int16 Index;
+                if (!Int16.TryParse(GetString(line, "SUBPOLYINDEX="), out Index))
+                    SubPolyIndex = -1;
+                else
+                    SubPolyIndex = Index;
                 Layer = layer;
                 Net_no = net;
                 Net_name = GetNetName(Net_no);
@@ -51,11 +59,17 @@ namespace ConvertToKicad
                 StringBuilder ret = new StringBuilder("");
                 string connectstyle = "";
 
-                double clearance = GetRuleValue("Clearance", "PolygonClearance");
+                if (SubPolyIndex != -1)
+                {
+                    OutputError("Reject region");
+                    return "";
+                }
+
+                double clearance = GetRuleValue(this, "Clearance", "PolygonClearance");
                 if (Layer.Substring(0, 2) == "In")
                 {
                     // this is an inner layer so use plane clearance
-                    clearance = GetRuleValue("PlaneClearance", "PlaneClearance");
+                    clearance = GetRuleValue(this, "PlaneClearance", "PlaneClearance");
                 }
 
                 if (Layer != "Edge.Cuts")
@@ -63,7 +77,7 @@ namespace ConvertToKicad
                     List<string> Layers = Brd.GetLayers(Layer);
                     foreach (var L in Layers)
                     {
-                        ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {L}) (tstamp 0) (hatch edge 0.508)");
+                        ret.Append($"  (zone (net {Net_no}) (net_name {Net_name}) (layer {L}) (hatch edge 0.508)");
                         ret.Append($"    (priority 100)\n");
                         ret.Append($"    (connect_pads {connectstyle} (clearance {clearance}))\n"); // TODO sort out these numbers properly
                         ret.Append($"    (min_thickness 0.2)\n");
@@ -101,7 +115,7 @@ namespace ConvertToKicad
 
             // inside component region
             // presently this is not allowed (V5.1.2)
-            public override string ToString(double x, double y, double ModuleRotation)
+            public string ToString(double x, double y, double ModuleRotation)
             {
                 // not allowed so just return
                 return "";
@@ -207,7 +221,7 @@ namespace ConvertToKicad
                             ms.Seek(1, SeekOrigin.Begin);
                             short Flags = (short)br.ReadInt16();
                             ms.Seek(3, SeekOrigin.Begin);
-                            int net = (int)br.ReadInt16();
+                            int net = (int)br.ReadInt16()+1;
                             ms.Seek(7, SeekOrigin.Begin);
                             Component = br.ReadInt16();
                             InComponent = Component != -1;
@@ -221,6 +235,11 @@ namespace ConvertToKicad
                             Int32 DataLen = br.ReadInt32();
                             string l = Brd.GetLayer((Layers)Layer);
                             Region r = new Region(l, net, Flags, str);
+                            if(r.SubPolyIndex > 0)
+                            {
+                                // Rejected region
+                                return true;
+                            }
                             while (DataLen-- > 0)
                             {
                                 double X = Math.Round(ToMM(br.ReadDouble()) - originX, Precision);

@@ -11,7 +11,7 @@ namespace ConvertToKicad
         // class for a shape based 3d model
         // creation of a .step file equivalent or .wrl not implemented
         // any volunteers?
-        class ShapeBasedModel : Object
+        class ShapeBasedModel : PCBObject
         {
             public string ID { get; set; }
             public string Checksum { get; set; }
@@ -105,10 +105,10 @@ namespace ConvertToKicad
                 }
             }
 
-            public override string ToString(double x, double y, double ModuleRotation)
+            public string ToString(double x, double y, double ModuleRotation)
             {
                 //OutputError($"Shape based model not supported # ID {ID} X={X + x} Y={Y + y} Rotation={Rotation + ModuleRotation} ROTX={ROTX} ROTY={ROTY} ROTZ={ROTZ} Type={Type}\n#{Line}\n");
-                return $"# ID {ID} X={X + x} Y={Y + y} Rotation={Rotation + ModuleRotation} ROTX={ROTX} ROTY={ROTY} ROTZ={ROTZ} Type={Type}\n#{Line}\n";
+                return ""; // $"# ID {ID} X={X + x} Y={Y + y} Rotation={Rotation + ModuleRotation} ROTX={ROTX} ROTY={ROTY} ROTZ={ROTZ} Type={Type}\n#{Line}\n";
             }
         }
 

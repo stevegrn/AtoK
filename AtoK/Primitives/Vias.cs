@@ -9,7 +9,7 @@ namespace ConvertToKicad
     public partial class ConvertPCBDoc
     {
         // class for via objects
-        class Via : Object
+        class Via : PCBObject
         {
             double X { get; set; }
             double Y { get; set; }
@@ -39,7 +39,7 @@ namespace ConvertToKicad
                 EndLayer = endlayer;
             }
 
-            override public string ToString()
+            public override string ToString()
             {
                 string StartL = Brd.GetLayer(StartLayer);
                 string EndL = Brd.GetLayer(EndLayer);
@@ -150,7 +150,12 @@ namespace ConvertToKicad
                 else
                 {
                     // can't have vias in components in Kicad (yet) so add as a pad
-                    Pad Pad = new Pad("0", "thru_hole", "circle", X, Y, 0, Width, Width, HoleSize, "*.Cu", Net, RRatio);
+                    Pad Pad = new Pad("0", "thru_hole", "circle", X, Y, 0, Width, Width, HoleSize, "*.Cu", Net, RRatio)
+                    {
+                        SolderMaskExpansion = 0,
+                        PasteMaskExpansion = 0,
+                        Component = Component
+                    };
                     if (Component > 0 && Component < ModulesL.Count)
                         ModulesL[Component].Pads.Add(Pad);
                     else
