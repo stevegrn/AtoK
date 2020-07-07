@@ -249,9 +249,12 @@ namespace ConvertToKicad
                     switch (c)
                     {
                         case ' ':
-                            Tokens.Enqueue(Reduce(token.ToString()));
-                            token.Clear();
-                            InToken = false;
+                            if (InToken)
+                            {
+                                Tokens.Enqueue(Reduce(token.ToString()));
+                                token.Clear();
+                                InToken = false;
+                            }
                             break;
 
                         case '(':
@@ -331,7 +334,7 @@ namespace ConvertToKicad
                 }
                 else
                 {
-                    OutputString($"Got {token} Expected 'And' or 'Or' or 'XOR' or EOF");
+                    //OutputString($"Got {token} Expected 'And' or 'Or' or 'XOR' or EOF");
                     return null;
                 }
             }
@@ -345,8 +348,8 @@ namespace ConvertToKicad
                     Node node = ParseExp(ref tokens);
 
                     token = tokens.Dequeue();
-                    if (token != ")")
-                        OutputString("Expected ')'");
+                    //if (token != ")")
+                    //    OutputString("Expected ')'");
 
                     return node;
                 }

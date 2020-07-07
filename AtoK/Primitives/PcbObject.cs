@@ -194,6 +194,8 @@ namespace ConvertToKicad
 
             public bool InComponent(string component)
             {
+                bool match =  ModulesL[this.Component].Designator == component;
+                return match;
                 var Designators = new List<string>();
                 GFG gg = new GFG();
                 int i = 0;

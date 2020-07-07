@@ -365,11 +365,14 @@ namespace ConvertToKicad
                                 {
                                     type = "reference";
                                     Hide = Mod.DesignatorOn ? "" : "hide";
-                                    if (str.Contains("_"))
+                                    if (Brd.DesignatorDisplayMode && str.Contains("_"))
                                     {
-                                        // Virtual designator TODO get this from board info
-                                        // in project file
-                                        //str = str.Substring(0, str.IndexOf('_')); // TODO not possible to do this in pcbnew
+                                        // This is a virtual designator
+                                        // Pcbnew doesn't have anything like this so 
+                                        // set the designator onto the Dwgs.User layer
+                                        // and put a copy minus the channel designator on the 
+                                        // top/bottom overlay layer
+                                    //    str = str.Substring(0, str.IndexOf('_'));
                                     }
                                     Mod.Designator = str;
                                 }
@@ -383,14 +386,13 @@ namespace ConvertToKicad
                                         if (layer == "B.Cu")
                                         layer = "B.Fab";
 
-                                    if (str.Contains("_"))
+                                    /*if (Brd.DesignatorDisplayMode)
                                     {
-                                        // should only do this if Board-DESIGNATORDISPLAYMODE=1
-                                        // get the seperator from the project file (.PrjPCB)
+                                        // should get the seperator from the project file (.PrjPCB)
                                         // under ChannelRoomLevelSeperator
-                                        // Virtual designator TODO get this from board info
+                                        // can't find it in board data assume it's '_'
                                         str = str.Substring(0, str.IndexOf('_'));
-                                    }
+                                    }*/
                                     Mod.Comment = ToLiteral(str);
                                 }
                                 else
@@ -404,8 +406,21 @@ namespace ConvertToKicad
 
                                 if(Hide == "")
                                     GetBoundingBox(str, X, Y, Rotation, Height, Width);
-                                String String = new String(type, str, X, Y, Rotation, layer, Height, Width, Thickness, Hide, Mirror, Italic);
-                                ModulesL[Component].Strings.Add(String);
+
+                                if (Brd.DesignatorDisplayMode && str.Contains("_"))
+                                {
+                                    // put designator on Dwgs.User and virtual designator on silkscreen
+                                    String S1 = new String(type, str, X, Y, Rotation, "Dwgs.User", Height, Width, Thickness, Hide, Mirror, Italic);
+                                    ModulesL[Component].Strings.Add(S1);
+                                    str = str.Substring(0, str.IndexOf('_'));
+                                    String S2 = new String("user", str, X, Y, Rotation, layer, Height, Width, Thickness, Hide, Mirror, Italic);
+                                    ModulesL[Component].Strings.Add(S2);
+                                }
+                                else
+                                {
+                                    String String = new String(type, str, X, Y, Rotation, layer, Height, Width, Thickness, Hide, Mirror, Italic);
+                                    ModulesL[Component].Strings.Add(String);
+                                }
                             }
 
                         }

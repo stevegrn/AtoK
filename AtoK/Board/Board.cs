@@ -205,6 +205,13 @@ namespace ConvertToKicad
                 try
                 {
                     string[] words = line.Split('|');
+                    bool fd = false;
+                    foreach(var s in words)
+                    {
+
+                        if (s.Contains("_"))
+                            fd = true;
+                    }
                     InnerLayerCount = 0;
                     string ORIGINX = GetString(line, "ORIGINX=");
                     string ORIGINY = GetString(line, "ORIGINY=");
