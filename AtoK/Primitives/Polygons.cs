@@ -42,7 +42,6 @@ namespace ConvertToKicad
             {
                 string param;
                 Int32 net = 0;
-                string[] words = line.Split('|');
 
                 if ((param = GetString(line, "|NET=")) != "")
                 {

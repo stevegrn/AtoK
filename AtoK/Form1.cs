@@ -28,7 +28,7 @@ namespace AtoK
         public static string TextEditorLoc { get; set; }
         public static CleanEnum CleanFlag;
         ConcurrentQueue<string> dq = new ConcurrentQueue<string>();
-        public static Thread t; // ues for running the convert in  the background
+        public static Thread t; // used for running the convert in  the background
         private delegate void UpdateOutputDelegate(string s, Color colour);
 
         private UpdateOutputDelegate updateoutputDelegate = null;
@@ -171,6 +171,7 @@ namespace AtoK
 
         private void Form1_Resize(object sender, EventArgs e)
         {
+            Control control = (Control)sender;
             if (WindowState != LastWindowState)
             {
                 LastWindowState = WindowState;
@@ -178,13 +179,16 @@ namespace AtoK
                 if (WindowState == FormWindowState.Maximized)
                 {
                     Size = MaximisedSize;
+                    OutputList.Width = ClearHistory.Right - SelectSource.Left;
+                    OutputList.Left = FileHistory.Left;
+                    OutputList.Top = Verbose.Bottom + 10;
+                    OutputList.Height = control.Height - Verbose.Bottom - 60;
                 }
             }
             if (WindowState == FormWindowState.Normal)
             {
                 this.MinimumSize = new Size(this.Width, 0);
                 this.MaximumSize = new Size(this.Width, Int32.MaxValue);
-                Control control = (Control)sender;
                 // resize the output window 
                 // set top to bottom of button1
                 // set bottom to bottom of form
@@ -209,6 +213,10 @@ namespace AtoK
             if (t != null && t.IsAlive)
             {
                 t.Abort();
+                //for(var i = 0; i < 10; i++)
+                //    if 
+                while(ConvertPCBDoc.ConvertRunning)
+                    Thread.Sleep(1000);
             }
             Properties.Settings.Default.F1State = this.WindowState;
             if (this.WindowState == FormWindowState.Normal)

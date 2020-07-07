@@ -58,7 +58,6 @@ namespace ConvertToKicad
             public Module(string line)
             {
                 string param;
-                string[] words = line.Split('|');
 
                 Designator = "";
                 Comment = "";

@@ -101,7 +101,6 @@ namespace ConvertToKicad
             public Rule(string line)
             {
                 string param;
-                string[] words = line.Split('|');
                 Line = line;
                 Enabled = false;
                 if ((param = GetString(line, "|ENABLED=")) != "")

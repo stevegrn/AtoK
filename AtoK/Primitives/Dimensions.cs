@@ -49,7 +49,6 @@ namespace ConvertToKicad
             public Dimension(string line)
             {
                 string param;
-                string[] words = line.Split('|');
                 if ((param = GetString(line, "|X1=").Trim(charsToTrim)) != "")
                 {
                     X1 = GetCoordinateX(param);

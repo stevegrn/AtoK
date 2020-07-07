@@ -36,7 +36,6 @@ namespace ConvertToKicad
 
             public Region(string layer, int net, Int16 flags, string line)
             {
-                string[] words = line.Split('|');
                 Int16 Index;
                 if (!Int16.TryParse(GetString(line, "SUBPOLYINDEX="), out Index))
                     SubPolyIndex = -1;
@@ -230,7 +229,6 @@ namespace ConvertToKicad
                             ms.Seek(0x16, SeekOrigin.Begin);
                             byte[] bytes = br.ReadBytes(strlen);
                             string str = ConvertToString(bytes);
-                            string[] words = str.Split('|');
                             ms.Seek(0x16 + strlen, SeekOrigin.Begin);
                             Int32 DataLen = br.ReadInt32();
                             string l = Brd.GetLayer((Layers)Layer);

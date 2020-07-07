@@ -114,6 +114,9 @@
     </Compile>
     <Compile Include="CMConvert.cs" />
     <Compile Include="ConvertPCB.cs" />
+    <Compile Include="FFListBox.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>

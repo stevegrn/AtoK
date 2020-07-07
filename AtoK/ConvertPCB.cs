@@ -975,8 +975,14 @@ namespace ConvertToKicad
             {
                 if (Verbose)
                 {
-                    Program.Form.OutputList_Add(text, System.Drawing.Color.Black);
-                    Program.Form.OutputList_Update();
+                    try
+                    { 
+                        Program.Form.OutputList_Add(text, System.Drawing.Color.Black);
+                        Program.Form.OutputList_Update();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                    }
                 }
             }
         }

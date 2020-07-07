@@ -92,14 +92,6 @@ namespace ConvertToKicad
 
                 public Layer(string line, int number)
                 {
-                    string[] words = line.Split('|');
-                    int i = 0;
-                    foreach(var s in words)
-                    {
-                        if (s.Contains("InternalPlane"))
-                            break;
-                        i++;
-                    }
                     Name               = GetString(line, $"LAYER{number}NAME=");
                     PlaneNetName = "";
                     if(Name.Contains("InternalPlane"))
@@ -204,14 +196,6 @@ namespace ConvertToKicad
                 base.ProcessLine();
                 try
                 {
-                    string[] words = line.Split('|');
-                    bool fd = false;
-                    foreach(var s in words)
-                    {
-
-                        if (s.Contains("_"))
-                            fd = true;
-                    }
                     InnerLayerCount = 0;
                     string ORIGINX = GetString(line, "ORIGINX=");
                     string ORIGINY = GetString(line, "ORIGINY=");
