@@ -27,7 +27,7 @@ namespace ConvertToKicad
             public abstract class Node
             {
                 public abstract bool Eval(PCBObject Obj);
-                public double EvalExpr(PCBObject Obj)
+                public virtual double EvalExpr(PCBObject Obj)
                 {
                     return 0;
                 }
@@ -269,7 +269,7 @@ namespace ConvertToKicad
 
                 public override double EvalExpr(PCBObject Obj)
                 {
-                    return LeftExpression.EvalExpr(Obj) != RightExpression.EvalExpr(Obj);
+                    return 0; // LeftExpression.EvalExpr(Obj) != RightExpression.EvalExpr(Obj);
                 }
 
                 public override string ToString()
