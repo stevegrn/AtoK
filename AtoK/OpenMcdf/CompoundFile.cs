@@ -329,9 +329,14 @@ namespace OpenMcdf
             this.sectorRecycle = false;
             this.updateMode = CFSUpdateMode.ReadOnly;
             this.eraseFreeSectors = false;
+            try
+            {
+                LoadFile(fileName);
+            }
+            catch(Exception Ex)
+            {
 
-            LoadFile(fileName);
-
+            }
             DIFAT_SECTOR_FAT_ENTRIES_COUNT = (GetSectorSize() / 4) - 1;
             FAT_SECTOR_ENTRIES_COUNT = (GetSectorSize() / 4);
         }

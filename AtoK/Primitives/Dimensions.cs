@@ -49,6 +49,7 @@ namespace ConvertToKicad
             public Dimension(string line)
             {
                 string param;
+                ObjectType = PCBObjectType.Dimension;
                 if ((param = GetString(line, "|X1=").Trim(charsToTrim)) != "")
                 {
                     X1 = GetCoordinateX(param);

@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace ConvertToKicad
 {
     public partial class ConvertPCBDoc
     {
-        enum PCBObjectType
+        public enum PCBObjectType
         {
             Unknown,
             Pad,
@@ -22,12 +23,17 @@ namespace ConvertToKicad
             Coordinate,
             Fill,
             Designator,
-            Comment
+            Comment,
+            ComponentBody,
+            Module,
+            Dimension,
+            Rule,
+            ShapeBasedModel
         }
 
         public class PCBObject //: Object
         {
-            PCBObjectType Type;
+            public PCBObjectType ObjectType { get; set; }
             public double X1 { get; set; }
             public double Y1 { get; set; }
             public double X2 { get; set; }
@@ -58,52 +64,52 @@ namespace ConvertToKicad
 
             public bool IsArc()
             {
-                return Type == PCBObjectType.Arc;
+                return ObjectType == PCBObjectType.Arc;
             }
 
             public bool IsClass()
             {
-                return Type == PCBObjectType.Class;
+                return ObjectType == PCBObjectType.Class;
             }
 
             public bool IsComponentArc()
             {
-                return (Component != -1) && (Type == PCBObjectType.Class);
+                return (Component != -1) && (ObjectType == PCBObjectType.Class);
             }
 
             public bool IsComponentFill()
             {
-                return (Component != -1) && (Type == PCBObjectType.Fill);
+                return (Component != -1) && (ObjectType == PCBObjectType.Fill);
             }
 
             public bool IsComponentPad()
             {
-                return (Component != -1) && (Type == PCBObjectType.Pad);
+                return (Component != -1) && (ObjectType == PCBObjectType.Pad);
             }
 
             public bool IsComponentText()
             {
-                return (Component != -1) && (Type == PCBObjectType.Text);
+                return (Component != -1) && (ObjectType == PCBObjectType.Text);
             }
 
             public bool IsComponentTrack()
             {
-                return (Component != -1) && (Type == PCBObjectType.Track);
+                return (Component != -1) && (ObjectType == PCBObjectType.Track);
             }
 
             public bool IsComponentVia()
             {
-                return (Component != -1) && (Type == PCBObjectType.Via);
+                return (Component != -1) && (ObjectType == PCBObjectType.Via);
             }
 
             public bool IsConnection()
             {
-                return Type == PCBObjectType.Connection;
+                return ObjectType == PCBObjectType.Connection;
             }
 
             public bool IsCoordinate()
             {
-                return Type == PCBObjectType.Coordinate;
+                return ObjectType == PCBObjectType.Coordinate;
             }
 
             public bool IsCopperRegion()
@@ -133,27 +139,27 @@ namespace ConvertToKicad
 
             public bool IsFill()
             {
-                return Type == PCBObjectType.Fill;
+                return ObjectType == PCBObjectType.Fill;
             }
 
             public bool IsPad()
             {
-                return Type == PCBObjectType.Pad;
+                return ObjectType == PCBObjectType.Pad;
             }
 
             public bool IsPoly()
             {
-                return Type == PCBObjectType.Polygon;
+                return ObjectType == PCBObjectType.Polygon;
             }
 
             public bool IsPolygon()
             {
-                return Type == PCBObjectType.Polygon;
+                return ObjectType == PCBObjectType.Polygon;
             }
 
             public bool IsRegion()
             {
-                return Type == PCBObjectType.Region;
+                return ObjectType == PCBObjectType.Region;
             }
 
             public bool IsSplitPlane()
@@ -163,17 +169,17 @@ namespace ConvertToKicad
 
             public bool IsText()
             {
-                return Type == PCBObjectType.Text;
+                return ObjectType == PCBObjectType.Text;
             }
 
             public bool IsTrack()
             {
-                return Type == PCBObjectType.Track;
+                return ObjectType == PCBObjectType.Track;
             }
 
             public bool IsVia()
             {
-                return Type == PCBObjectType.Via;
+                return ObjectType == PCBObjectType.Via;
             }
 
             class GFG : IComparer<string>
@@ -195,6 +201,7 @@ namespace ConvertToKicad
             public bool InComponent(string component)
             {
                 bool match =  ModulesL[this.Component].Designator == component;
+                if (match) Debugger.Break();
                 return match;
                 var Designators = new List<string>();
                 GFG gg = new GFG();

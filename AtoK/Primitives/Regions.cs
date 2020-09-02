@@ -36,6 +36,7 @@ namespace ConvertToKicad
 
             public Region(string layer, int net, Int16 flags, string line)
             {
+                ObjectType = PCBObjectType.Region;
                 Int16 Index;
                 if (!Int16.TryParse(GetString(line, "SUBPOLYINDEX="), out Index))
                     SubPolyIndex = -1;

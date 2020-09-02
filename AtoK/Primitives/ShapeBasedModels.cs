@@ -39,6 +39,7 @@ namespace ConvertToKicad
 
             public ShapeBasedModel(string line)
             {
+                ObjectType = PCBObjectType.ShapeBasedModel;
                 Line = line;
                 try
                 {

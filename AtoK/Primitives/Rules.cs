@@ -100,6 +100,7 @@ namespace ConvertToKicad
 
             public Rule(string line)
             {
+                ObjectType = PCBObjectType.Rule;
                 string param;
                 Line = line;
                 Enabled = false;
@@ -227,8 +228,9 @@ namespace ConvertToKicad
                     }
                 }
             }
-            // not found return default value TODO find out what proper default value is
-            return 0.1; 
+            // not found return default value
+            // it seems 4mil is the default
+            return 0.1016; 
             /*
             foreach (var Rule in RulesL)
             {

@@ -27,6 +27,10 @@ namespace ConvertToKicad
             public abstract class Node
             {
                 public abstract bool Eval(PCBObject Obj);
+                public double EvalExpr(PCBObject Obj)
+                {
+                    return 0;
+                }
             }
 
             public abstract class UnaryNode : Node
@@ -155,6 +159,155 @@ namespace ConvertToKicad
                 }
             }
 
+            class LessThanNode : BinaryNode
+            {
+                    public LessThanNode(Node leftExpression, Node rightExpression)
+                        : base(leftExpression, rightExpression)
+                    {
+                    }
+
+                    public override bool Eval(PCBObject Obj)
+                    {
+                        return LeftExpression.EvalExpr(Obj) < RightExpression.EvalExpr(Obj);
+                    }
+
+                    public override string ToString()
+                    {
+                        var sb = new StringBuilder("");
+                        sb.Append("(");
+                        sb.Append(LeftExpression.ToString());
+                        sb.Append(" < ");
+                        sb.Append(RightExpression.ToString());
+                        sb.Append(")");
+                        return sb.ToString();
+                    }
+            }
+
+            class LessThanOrEqualsNode : BinaryNode
+            {
+                public LessThanOrEqualsNode(Node leftExpression, Node rightExpression)
+                    : base(leftExpression, rightExpression)
+                {
+                }
+
+                public override bool Eval(PCBObject Obj)
+                {
+                    return LeftExpression.EvalExpr(Obj) <= RightExpression.EvalExpr(Obj);
+                }
+
+                public override string ToString()
+                {
+                    var sb = new StringBuilder("");
+                    sb.Append("(");
+                    sb.Append(LeftExpression.ToString());
+                    sb.Append(" <= ");
+                    sb.Append(RightExpression.ToString());
+                    sb.Append(")");
+                    return sb.ToString();
+                }
+            }
+
+            class GreaterThanOrEqualsNode : BinaryNode
+            {
+                public GreaterThanOrEqualsNode(Node leftExpression, Node rightExpression)
+                    : base(leftExpression, rightExpression)
+                {
+                }
+
+                public override bool Eval(PCBObject Obj)
+                {
+                    return LeftExpression.EvalExpr(Obj) >= RightExpression.EvalExpr(Obj);
+                }
+
+                public override string ToString()
+                {
+                    var sb = new StringBuilder("");
+                    sb.Append("(");
+                    sb.Append(LeftExpression.ToString());
+                    sb.Append(" >= ");
+                    sb.Append(RightExpression.ToString());
+                    sb.Append(")");
+                    return sb.ToString();
+                }
+            }
+
+            class GreaterThanNode : BinaryNode
+            {
+                public GreaterThanNode(Node leftExpression, Node rightExpression)
+                    : base(leftExpression, rightExpression)
+                {
+                }
+
+                public override bool Eval(PCBObject Obj)
+                {
+                    return LeftExpression.EvalExpr(Obj) > RightExpression.EvalExpr(Obj);
+                }
+
+                public override string ToString()
+                {
+                    var sb = new StringBuilder("");
+                    sb.Append("(");
+                    sb.Append(LeftExpression.ToString());
+                    sb.Append(" > ");
+                    sb.Append(RightExpression.ToString());
+                    sb.Append(")");
+                    return sb.ToString();
+                }
+            }
+
+            class NotEqualsNode : BinaryNode
+            {
+                public NotEqualsNode(Node leftExpression, Node rightExpression)
+                    : base(leftExpression, rightExpression)
+                {
+                }
+
+                public override bool Eval(PCBObject Obj)
+                {
+                    return LeftExpression.EvalExpr(Obj) != RightExpression.EvalExpr(Obj);
+                }
+
+                public override double EvalExpr(PCBObject Obj)
+                {
+                    return LeftExpression.EvalExpr(Obj) != RightExpression.EvalExpr(Obj);
+                }
+
+                public override string ToString()
+                {
+                    var sb = new StringBuilder("");
+                    sb.Append("(");
+                    sb.Append(LeftExpression.ToString());
+                    sb.Append(" <> ");
+                    sb.Append(RightExpression.ToString());
+                    sb.Append(")");
+                    return sb.ToString();
+                }
+            }
+
+            class EqualsNode : BinaryNode
+            {
+                public EqualsNode(Node leftExpression, Node rightExpression)
+                    : base(leftExpression, rightExpression)
+                {
+                }
+
+                public override bool Eval(PCBObject Obj)
+                {
+                    return LeftExpression.EvalExpr(Obj) == RightExpression.EvalExpr(Obj);
+                }
+
+                public override string ToString()
+                {
+                    var sb = new StringBuilder("");
+                    sb.Append("(");
+                    sb.Append(LeftExpression.ToString());
+                    sb.Append(" = ");
+                    sb.Append(RightExpression.ToString());
+                    sb.Append(")");
+                    return sb.ToString();
+                }
+            }
+
             class RoleNode : Node
             {
                 private readonly string _roleName;
@@ -248,6 +401,53 @@ namespace ConvertToKicad
                     char c = text[i];
                     switch (c)
                     {
+                        case '<':
+                            if(InToken)
+                            {
+                                Tokens.Enqueue(token.ToString());
+                                token.Clear();
+                                InToken = false;
+                            }
+                            if(text[i+1]=='>')
+                            {
+                                i++;
+                                Tokens.Enqueue("<>");
+                            }
+                            else
+                            if(text[i+1] == '=')
+                            {
+                                i++;
+                                Tokens.Enqueue("<=");
+                            }
+                            else
+                            {
+                                Tokens.Enqueue("<");
+                            }
+                            break;
+                        case '>':
+                            if (InToken)
+                            {
+                                Tokens.Enqueue(token.ToString());
+                                token.Clear();
+                                InToken = false;
+                            }
+                            if (text[i + 1] == '=')
+                            {
+                                i++;
+                                Tokens.Enqueue(">=");
+                            }
+                            else
+                                Tokens.Enqueue(">");
+                            break;
+                        case '=':
+                            if (InToken)
+                            {
+                                Tokens.Enqueue(token.ToString());
+                                token.Clear();
+                                InToken = false;
+                            }
+                            Tokens.Enqueue("=");
+                            break;
                         case ' ':
                             if (InToken)
                             {
@@ -331,6 +531,36 @@ namespace ConvertToKicad
                 {
                     Node rightExp = ParseExp(ref tokens);
                     return new XorNode(leftExp, rightExp);
+                }
+                else if (token == "<")
+                {
+                    Node rightExp = ParseExp(ref tokens);
+                    return new LessThanNode(leftExp, rightExp);
+                }
+                else if (token == "<=")
+                {
+                    Node rightExp = ParseExp(ref tokens);
+                    return new LessThanOrEqualsNode(leftExp, rightExp);
+                }
+                else if (token == "<>")
+                {
+                    Node rightExp = ParseExp(ref tokens);
+                    return new NotEqualsNode(leftExp, rightExp);
+                }
+                else if (token == ">")
+                {
+                    Node rightExp = ParseExp(ref tokens);
+                    return new GreaterThanNode(leftExp, rightExp);
+                }
+                else if (token == ">=")
+                {
+                    Node rightExp = ParseExp(ref tokens);
+                    return new GreaterThanOrEqualsNode(leftExp, rightExp);
+                }
+                else if (token == "=")
+                {
+                    Node rightExp = ParseExp(ref tokens);
+                    return new EqualsNode(leftExp, rightExp);
                 }
                 else
                 {

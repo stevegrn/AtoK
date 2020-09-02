@@ -105,6 +105,8 @@ namespace ConvertToKicad
 
             public override string ToString(double x, double y, double ModuleRotation)
             {
+                if (Value == "")
+                    return "";
                 // make strings position relative to the module
                 Point2D p = new Point2D(X - x, Y - y);
                 p.Rotate(-ModuleRotation);

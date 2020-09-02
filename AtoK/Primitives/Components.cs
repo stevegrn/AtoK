@@ -58,7 +58,7 @@ namespace ConvertToKicad
             public Module(string line)
             {
                 string param;
-
+                ObjectType = PCBObjectType.Module;
                 Designator = "";
                 Comment = "";
 

@@ -30,6 +30,7 @@ namespace ConvertToKicad
 
             public ComponentBody(string line)
             {
+                ObjectType = PCBObjectType.ComponentBody;
                 string Ident = GetString(line, "IDENTIFIER=");
                 try
                 {

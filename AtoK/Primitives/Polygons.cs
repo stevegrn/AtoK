@@ -41,6 +41,7 @@ namespace ConvertToKicad
             public Polygon(string line) // string Layer, int net)
             {
                 string param;
+                ObjectType = PCBObjectType.Polygon;
                 Int32 net = 0;
 
                 if ((param = GetString(line, "|NET=")) != "")

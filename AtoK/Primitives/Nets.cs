@@ -22,6 +22,7 @@ namespace ConvertToKicad
 
             public Net(int number, string name)
             {
+                ObjectType = PCBObjectType.Net;
                 Number = number;
                 Name = ConvertIfNegated(name);
             }

@@ -32,6 +32,7 @@ namespace ConvertToKicad
 
             private Pad()
             {
+                ObjectType = PCBObjectType.Pad;
                 Number = "0";
                 Type = "thru_hole";
                 Shape = "circle";
@@ -52,6 +53,7 @@ namespace ConvertToKicad
 
             public Pad(string number, string type, string shape, double x, double y, double rotation, double sizex, double sizey, double drill, string layer, int net, double rratio)
             {
+                ObjectType = PCBObjectType.Pad;
                 if (number == "")
                     number = "0";
                 if(number.Contains(" "))
@@ -82,6 +84,7 @@ namespace ConvertToKicad
 
             public Pad(double XSize, double YSize)
             {
+                ObjectType = PCBObjectType.Pad;
                 Number = "0";
                 Type = "thru_hole";
                 Shape = "circle";
