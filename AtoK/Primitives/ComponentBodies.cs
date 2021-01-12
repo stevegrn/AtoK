@@ -69,7 +69,7 @@ namespace ConvertToKicad
                 }
             }
 
-            public string ToString(double x, double y, double modulerotation)
+            public override string ToString(double x, double y, double modulerotation)
             {
                 string FileName = Mods.GetFilename(ID).ToLower();
 
