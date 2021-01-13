@@ -113,14 +113,6 @@ namespace ConvertToKicad
                         {
                             ret.Append($"    (gr_poly {OutputPoints()}  (layer {L}) (width 0))\n");
                         }
-                       // foreach (var Point in Points)
-                      //  {
-                        //    i++;
-                          //  if ((i % 5) == 0)
-                            //    ret.Append("\n        ");
-                           // ret.Append(Point.ToString());
-                       // }
-                       // ret.Append("\n      )\n    )\n  )\n");
                     }
                 }
                 else
