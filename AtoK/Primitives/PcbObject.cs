@@ -50,7 +50,7 @@ namespace ConvertToKicad
             {
             }
 
-            public virtual string ToString() => base.ToString();
+            //public virtual string ToString() => base.ToString();
 
             public virtual string ToString(double x, double y, double rotation)
             {
