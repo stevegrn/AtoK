@@ -15,9 +15,11 @@ namespace ConvertToKicad
                 REFERENCE1POINTX = 0, REFERENCE1POINTY = 0, ARROWSIZE = 0, ARROWLINEWIDTH = 0, ARROWLENGTH = 0, TEXTX = 0, TEXTY = 0, TEXT1X = 0, TEXT1Y = 0,
                 LINEWIDTH = 0, TEXTHEIGHT = 0, TEXTWIDTH = 0, ANGLE = 0;
             private readonly int TEXTPRECISION;
+            private readonly int TextFormat;
             private readonly Int16 DIMENSIONKIND;
             private readonly char[] charsToTrim = { 'm', 'i', 'l' };
             private string DimensionUnit = "";
+            private string TextPosition = "";
 
             double length;
 
@@ -48,6 +50,7 @@ namespace ConvertToKicad
 
             public Dimension(string line)
             {
+                string[] words = line.Split('|');
                 string param;
                 ObjectType = PCBObjectType.Dimension;
                 if ((param = GetString(line, "|X1=").Trim(charsToTrim)) != "")
@@ -107,6 +110,11 @@ namespace ConvertToKicad
                 {
                     REFERENCE1POINTY = GetCoordinateY(param);
                 }
+                if ((param = GetString(line, "|TEXTPOSITION=")) != "")
+                {
+                    TextPosition = param;
+                }
+
                 if ((param = GetString(line, "|ANGLE=").Trim(charsToTrim)) != "")
                 {
                     ANGLE = Math.Round(Convert.ToDouble(param), Precision);
@@ -163,10 +171,34 @@ namespace ConvertToKicad
                 {
                     TEXTPRECISION = Convert.ToInt32(param);
                 }
+                if ((param = GetString(line, "|TEXTFORMAT=").Trim(charsToTrim)) != "")
+                {
+                    TextFormat = Convert.ToInt32(param);
+                }
                 if ((param = GetString(line, "|TEXTDIMENSIONUNIT=").Trim(charsToTrim)) != "")
                 {
                     DimensionUnit = param;
                 }
+                // translate to fit in worksheet
+                Point2D R0 = new Point2D(REFERENCE0POINTX, REFERENCE0POINTY);
+                Point2D R1 = new Point2D(REFERENCE1POINTX, REFERENCE1POINTY);
+                Point2D centre = new Point2D(X1, Y1);
+
+                // rotate the two reference points to make horizontal dimension
+                R0 = R0.Rotate(centre, -ANGLE);
+                R1 = R1.Rotate(centre, -ANGLE);
+                Point2D end = new Point2D(R1.X, Y1);
+                Point2D a1a = new Point2D(X1 + ARROWSIZE, Y1 + ARROWSIZE / 3);
+                Point2D a1b = new Point2D(X1 + ARROWSIZE, Y1 - ARROWSIZE / 3);
+                Point2D a2a = new Point2D(end.X - ARROWSIZE, end.Y + ARROWSIZE / 3);
+                Point2D a2b = new Point2D(end.X - ARROWSIZE, end.Y - ARROWSIZE / 3);
+                CheckMinMax(X1, Y1);
+                CheckMinMax(end.X, end.Y);
+                CheckMinMax(a1a.X, a1a.Y);
+                CheckMinMax(a1b.X, a1b.Y);
+                CheckMinMax(a2a.X, a2a.Y);
+                CheckMinMax(a2b.X, a2b.Y);
+
             }
 
             public override string ToString()
@@ -203,6 +235,7 @@ namespace ConvertToKicad
                     a2b = new Point2D(end.X + ARROWSIZE, end.Y - ARROWSIZE / 3);
                 }
                 string units;
+                int UnitsIndex=0;
                 int Ilength;
                 int Dlength;
                 // convert length to string based on Units and precision
@@ -211,20 +244,25 @@ namespace ConvertToKicad
                     case "Mils":
                         length = length / 25.4 * 1000;
                         units = "mil";
+                        UnitsIndex = 1;
                         break;
                     case "Millimeters":
                         units = "mm";
+                        UnitsIndex = 2;
                         break;
                     case "Inches":
                         length = length /25.4;
                         units = "in";
+                        UnitsIndex = 0;
                         break;
                     case "Centimeters":
                         length = length / 10;
                         units = "cm";
+                        UnitsIndex = 2; // no CM in Pcbnew (yet)
                         break;
                     default:// mm
                         units = "mm";
+                        UnitsIndex = 2;
                         break;
                 }
 
@@ -252,13 +290,30 @@ namespace ConvertToKicad
 
                 var string1 = new StringBuilder("");
                 var Layers = Brd.GetLayers(Brd.GetLayer(layer));
+                string Justify = "";
+                switch(TextPosition)
+                {
+                    case "Auto":            break; // just do centre
+                    case "Center":          break; // just do centre
+                    case "Top":             break; // just do centre
+                    case "Bottom":          break; // just do centre
+                    case "Right":           Justify = "(justify right)"; break;
+                    case "Left":            Justify = "(justify left)";  break;
+                    case "InsideRight":     Justify = "(justify right)"; break;
+                    case "InsideLeft":      Justify = "(justify left)";  break;
+                    case "UniDirectional":  break; // just do centre
+                    case "Manual":          break; // just do centre
+                }
+
                 foreach (var L in Layers)
                 {
                     string1.Append($@"
   (dimension 176 (width {LINEWIDTH}) (layer {L})
     (gr_text {text} (at {TEXT1X} {-TEXT1Y} {ANGLE}) (layer {L.ToString()})
-        (effects (font (size {Math.Round(TEXTHEIGHT, Precision)} {Math.Round(TEXTHEIGHT, Precision)}) (thickness {Math.Round(LINEWIDTH, Precision)})) (justify left ))
+        (effects (font (size {Math.Round(TEXTHEIGHT, Precision)} {Math.Round(TEXTHEIGHT, Precision)}) (thickness {Math.Round(LINEWIDTH, Precision)})) {Justify})
     )
+    (format (units {UnitsIndex}) (units_format {1}) (precision {TEXTPRECISION}))
+    (style  (thickness {TEXTWIDTH}) (arrow_length {ARROWLENGTH}) (text_position_mode {1}) (extension_height {1}) (extension_offset 0) keep_text_aligned )
     (feature1 (pts (xy {end.X} {-end.Y}) (xy {R1.X} {-R1.Y})  ))
     (feature2 (pts  (xy {X1} {-Y1}) (xy {R0.X} {-R0.Y})))
     (crossbar (pts (xy {X1} {-Y1}) (xy {end.X} {-end.Y})))
@@ -268,13 +323,6 @@ namespace ConvertToKicad
     (arrow2b  (pts (xy {end.X} {-end.Y}) (xy {a2b.X} {-a2b.Y})))
   )");
                 }
-                CheckMinMax(X1, Y1);
-                CheckMinMax(end.X, end.Y);
-                CheckMinMax(a1a.X, a1a.Y);
-                CheckMinMax(a1b.X, a1b.Y);
-                CheckMinMax(a2a.X, a2a.Y);
-                CheckMinMax(a2b.X, a2b.Y);
-
                 return string1.ToString() ;
             }
         }

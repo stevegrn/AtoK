@@ -14,10 +14,10 @@ namespace ConvertToKicad
 {
     public static class Globals
     {
-        static public string ReportFilename;
-        static public int ReportLines;
-        static public double MinX, MinY, MaxX, MaxY;
-        static public bool PcbnewVersion;
+        public static string ReportFilename;
+        public static int ReportLines;
+        public static double MinX, MinY, MaxX, MaxY;
+        public static bool PcbnewVersion;
     }
 
     public partial class ConvertPCBDoc
@@ -157,7 +157,7 @@ namespace ConvertToKicad
         }
 
         // find the string 's' within the string 'line' and return the remaining string up to the next '|'
-        static public string GetString(string line, string s)
+        public static string GetString(string line, string s)
         {
             int index;
             int start, end;
@@ -177,7 +177,7 @@ namespace ConvertToKicad
         }
 
         // get unsigned 32 bit number
-        static public UInt32 GetUInt32(string number)
+        public static UInt32 GetUInt32(string number)
         {
             if (number == "")
                 return 0;
@@ -185,14 +185,14 @@ namespace ConvertToKicad
         }
 
         // get double number
-        static public double GetDouble(string number)
+        public static double GetDouble(string number)
         {
             if (number == "")
                 return 0;
             return Math.Round(Convert.ToDouble(number.Trim(charsToTrim)), Precision);
         }
 
-        static public string GetNetName(int net_no)
+        public static string GetNetName(int net_no)
         {
             if (net_no == -1)
                 return "\"\"";
@@ -377,7 +377,7 @@ namespace ConvertToKicad
 
         // convert Altium negation to Kicad negation
         // e.g. convert "M\_\W\E\" "~M_WE"
-        static public string ConvertIfNegated(string Name)
+        public static string ConvertIfNegated(string Name)
         {
             if (Name.IndexOf('\\') == -1)
                 return Name;
@@ -488,7 +488,7 @@ namespace ConvertToKicad
         }
 
         // convert Altium mil value string to millimeters
-        static public double GetNumberInMM(string number)
+        public static double GetNumberInMM(string number)
         {
             if (number == "")
                 return 0;
@@ -496,26 +496,26 @@ namespace ConvertToKicad
         }
 
         // convert Altium int mil value to mm
-        static public double ToMM(int val)
+        public static double ToMM(int val)
         {
             return Math.Round((double)val * 25.4 / 10000000, Precision);
         }
 
         // convert Altium double mil value to mm 
-        static public double ToMM(double val)
+        public static double ToMM(double val)
         {
             return Math.Round(val * 25.4 / 10000000, Precision);
         }
 
         // convert 32 bit fixed point value in mil to mm 
-        static public double ToMM(byte[] arr, int pos)
+        public static double ToMM(byte[] arr, int pos)
         {
             Int32 val = arr[pos] + (arr[pos + 1] << 8) + (arr[pos + 2] << 16) + (arr[pos + 3] << 24);
             return Math.Round((double)val * 25.4 / 10000000, Precision);
         }
 
         // convert 32 bit fixed point value in mil to mm 
-        static public double Bytes2mm(byte[] arr)
+        public static double Bytes2mm(byte[] arr)
         {
             // altium store numbers as fixed point /10000 to get value in mils
             Int32 val = arr[0] + (arr[1] << 8) + (arr[2] << 16) + (arr[3] << 24);
@@ -523,13 +523,13 @@ namespace ConvertToKicad
         }
 
         // convert byte array to unsigned 16 bit integer
-        static public UInt16 B2UInt16(byte[] arr, int pos)
+        public static UInt16 B2UInt16(byte[] arr, int pos)
         {
             return (UInt16)(arr[pos] + (arr[pos + 1] << 8));
         }
 
         // convert byte array to 16 bit integer
-        static public Int16 B2Int16(byte[] arr, int pos)
+        public static Int16 B2Int16(byte[] arr, int pos)
         {
             return (Int16)(arr[pos] + (arr[pos + 1] << 8));
         }
@@ -1021,7 +1021,7 @@ namespace ConvertToKicad
             }
         }
 
-        static public string GetTimeString(double time)
+        public static string GetTimeString(double time)
         {
             if (time > 1000)
                 return $"{time / 1000} S";
@@ -1029,7 +1029,7 @@ namespace ConvertToKicad
                 return $"{time} mS";
         }
 
-        static public void CheckMinMax(double x, double y)
+        public static void CheckMinMax(double x, double y)
         {
             if (x < Globals.MinX)
                 Globals.MinX = x;
@@ -1475,7 +1475,7 @@ namespace ConvertToKicad
                 Directory.SetCurrentDirectory("..\\");
                 OutputString($"Finished time taken = {GetTimeString(StopWatch.ElapsedMilliseconds)}");
             }
-            catch (ThreadAbortException abortException)
+            catch (ThreadAbortException)
             {
                 ConvertRunning = false;
                 OutputString("Aborted");
