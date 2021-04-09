@@ -162,7 +162,8 @@ namespace AtoK
             else
                 FileHistory.SelectedIndex = Properties.Settings.Default.ComboBoxIndex;
 
-            FileHistory.Text = (string)FileHistory.Items[FileHistory.SelectedIndex];
+            if(FileHistory.SelectedIndex != -1)
+                FileHistory.Text = (string)FileHistory.Items[FileHistory.SelectedIndex];
 
             EnableControls();
         }
